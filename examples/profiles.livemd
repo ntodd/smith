@@ -1,0 +1,59 @@
+# Sketches, revolve, and loft
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Draw a ring
+
+Sketches describe one connected planar region, optionally with holes. They can be
+previewed as faces before extrusion.
+
+```elixir
+alias Smith.{Plane, Sketch}
+outline = Sketch.circle(25) |> Sketch.cut(Sketch.circle(15))
+{:ok, preview} = Smith.Kino.render(outline, label: "1 · Ring sketch")
+preview
+```
+
+## Extrude along the normal
+
+```elixir
+ring = outline |> Smith.extrude(4)
+{:ok, preview} = Smith.Kino.render(ring, label: "2 · Extruded ring")
+preview
+```
+
+## Revolve a cross-section
+
+The XZ plane's local Y points along world Z. Keep the section to one side of the
+rotation axis to produce a hollow sleeve.
+
+```elixir
+sleeve =
+  Sketch.rectangle(4, 20, align: {:min, :min}, at: {12, 0}, on: Plane.xz())
+  |> Smith.revolve({0, 0, 1})
+{:ok, preview} = Smith.Kino.render(sleeve, label: "Revolved sleeve")
+preview
+```
+
+## Connect sections with a ruled loft
+
+```elixir
+transition = Smith.loft([
+  Sketch.rectangle(30, 20),
+  Sketch.rectangle(20, 10, on: Plane.xy(z: 30))
+])
+{:ok, preview} = Smith.Kino.render(transition, label: "Ruled transition")
+preview
+```
+
+## Export the ring
+
+```elixir
+{:ok, result} = Smith.evaluate(ring)
+{:ok, volume} = OCEx.volume(result.shape)
+true = abs(volume - :math.pi() * (25 * 25 - 15 * 15) * 4) < 1.0e-6
+{:ok, files} = Smith.export(result, "output/livebook", name: "ring", on_bed: true)
+files
+```

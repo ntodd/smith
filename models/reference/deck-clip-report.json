@@ -1,0 +1,857 @@
+{
+  "status": "provisional fit/review prototype",
+  "parameters_mm": {
+    "width": 70.4,
+    "depth": 47.5,
+    "height": 26.0,
+    "plate_thickness": 5.0,
+    "hook_width": 40.4,
+    "hook_thickness": 5.0,
+    "hook_gap": 11.2,
+    "hook_tip_from_flange": 18.0,
+    "main_spacing": 50.6,
+    "main_diameter": 5.0,
+    "recess_diameter": 9.6,
+    "hole_row_from_flange": 6.5,
+    "flange_height": 18.5,
+    "flange_spacing": 50.75,
+    "flange_diameter": 4.6,
+    "flange_hole_elevation": 9.5,
+    "flange_thickness": 3.4,
+    "recess_depth": 2.1,
+    "widening_radius": 14.2,
+    "terminal_flare_length": 2.0,
+    "shoulder_start": 17.0,
+    "shoulder_end": 28.0,
+    "corner_chamfer": 2.5,
+    "tip_side_inset": 3.0,
+    "tip_taper_start_y": 30.0,
+    "edge_radius": 0.8,
+    "flare_tip_thickness": 3.5
+  },
+  "assumptions": [
+    "Radii provisionally interpreted on outside surface; confirmation pending.",
+    "Tight outside radius is 10.6 mm (approximately reported 10.5), derived from 11.2 mm throat and 5 mm walls.",
+    "14.2 mm outside radius opens the return arm outward; final tangent lead-in is an estimated 2 mm long.",
+    "11.2 mm applies to the tight internal throat, not the flared mouth.",
+    "18 mm locates the nearest free-tip edge from flange outside (Y=0); with outward flare this is the inner edge.",
+    "Shoulder positions and 2.5 mm corner chamfers estimated from photos.",
+    "Raised edge borders, underside molding pockets/bosses, small flange ribs, draft, and cosmetic fillets omitted.",
+    "Main section stays 5 mm; outer flare surface gradually thins to 3.5 mm at the tip. Side taper is 3 mm per side; edge rounds are R0.8 mm.",
+    "Edge rounding slightly retreats the extreme tip and height from the nominal sharp-edge envelope."
+  ],
+  "hook_geometry": {
+    "root_outer_radius": 10.6,
+    "root_inner_radius": 5.6,
+    "widening_outer_radius": 14.2,
+    "widening_inner_radius": 19.2,
+    "root_center_y": 36.9,
+    "root_center_z": 10.6,
+    "widening_center_y": 32.111542149718574,
+    "widening_center_z": 35.4,
+    "flare_angle_deg": 41.0251777096631,
+    "terminal_flare_length": 2.0,
+    "straight_return_length": 4.788457850281425,
+    "throat_z": 16.2,
+    "throat_y": 34.50577107485928,
+    "inner_tip_yz": [
+      18.0,
+      22.22789393617269
+    ],
+    "outer_tip_yz": [
+      20.297367137221705,
+      24.868368180851803
+    ],
+    "thickness_probes": [
+      [
+        [
+          32.111542149718574,
+          16.2
+        ],
+        [
+          0.0,
+          1.0
+        ],
+        5.0
+      ],
+      [
+        [
+          28.202154639538847,
+          16.60221584081648
+        ],
+        [
+          0.20361393282186077,
+          0.9790512582908082
+        ],
+        4.765625
+      ],
+      [
+        [
+          24.45656062774291,
+          17.792011531744713
+        ],
+        [
+          0.39869695426956575,
+          0.9170827327216295
+        ],
+        4.25
+      ],
+      [
+        [
+          21.031691077331985,
+          19.719537627552757
+        ],
+        [
+          0.5770755766868015,
+          0.8166907485649605
+        ],
+        3.734375
+      ],
+      [
+        [
+          19.18803755476146,
+          21.194231728864967
+        ],
+        [
+          0.6563906106347736,
+          0.754421212765461
+        ],
+        3.542
+      ]
+    ],
+    "nominal_flare_tip_thickness": 3.5
+  },
+  "checks": {
+    "valid_solid": true,
+    "measured_flare_thicknesses_mm": [
+      5.0,
+      4.765625016804012,
+      4.250000057742223,
+      3.7343810878278934,
+      3.5421495881813967
+    ],
+    "solid_count": 1,
+    "envelope_mm": [
+      70.4,
+      47.5,
+      24.54798315241731
+    ],
+    "nominal_envelope_mm": [
+      70.4,
+      47.5,
+      26.0
+    ],
+    "edge_radius_mm": 0.8,
+    "nominal_tip_width_mm": 34.4,
+    "volume_mm3": 21823.557042961264,
+    "cylindrical_faces": [
+      {
+        "radius": 10.6,
+        "axis_position": [
+          -20.2,
+          36.9,
+          10.6
+        ],
+        "axis_direction": [
+          -1.0,
+          -0.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.4,
+          28.0,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          19.4,
+          28.0,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.726909069097985,
+          27.354876003315436,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          -0.8064049958557057,
+          -0.5913636636275174,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.726909069098,
+          16.35487600331544,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          -0.8064049958557057,
+          0.5913636636275174,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          0.0,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          17.0,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          35.2,
+          0.7999999999999999,
+          0.7999999999999999
+        ],
+        "axis_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 2.5,
+        "axis_position": [
+          25.3,
+          9.9,
+          -1.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 2.5,
+        "axis_position": [
+          -25.3,
+          9.9,
+          -1.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -21.0,
+          28.40539067934604,
+          0.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          20.999999999999996,
+          28.40539067934605,
+          0.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.4,
+          36.9,
+          20.4
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          19.4,
+          36.9,
+          20.4
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.4,
+          36.9,
+          4.2
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.4,
+          32.111542149718574,
+          17.0
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.4,
+          30.098484500494134,
+          16.316462860623577
+        ],
+        "axis_direction": [
+          -0.0,
+          -0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          19.4,
+          36.9,
+          4.2
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          19.4,
+          32.111542149718574,
+          17.0
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          19.4,
+          30.098484500494134,
+          16.316462860623577
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          16.59460932065395,
+          0.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -19.72690906909798,
+          27.354876003315432,
+          4.2
+        ],
+        "axis_direction": [
+          -0.8064049958557057,
+          -0.5913636636275174,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          16.594609320653962,
+          0.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.726909069098,
+          16.354876003315436,
+          4.2
+        ],
+        "axis_direction": [
+          -0.8064049958557057,
+          0.5913636636275174,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          0.7999999999999999,
+          16.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          -1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          0.0,
+          15.668629150101527
+        ],
+        "axis_direction": [
+          -0.0,
+          1.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          17.0,
+          4.2
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -34.400000000000006,
+          2.6000000000000005,
+          16.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          -1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          0.7999999999999999,
+          0.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          3.3999999999999986,
+          4.2
+        ],
+        "axis_direction": [
+          0.0,
+          1.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          0.0,
+          15.668629150101527
+        ],
+        "axis_direction": [
+          -0.0,
+          1.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.400000000000006,
+          2.6,
+          5.0
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.63431457505077,
+          0.7999999999999999,
+          15.434314575050765
+        ],
+        "axis_direction": [
+          -0.7071067811865476,
+          0.0,
+          0.7071067811865476
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -32.134314575050766,
+          0.7999999999999999,
+          17.934314575050767
+        ],
+        "axis_direction": [
+          -0.7071067811865476,
+          -0.0,
+          -0.7071067811865476
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          32.7,
+          0.7999999999999999,
+          17.7
+        ],
+        "axis_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 2.3,
+        "axis_position": [
+          25.375,
+          4.4,
+          9.5
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          2.220446049250313e-16
+        ]
+      },
+      {
+        "radius": 2.3,
+        "axis_position": [
+          -25.375,
+          4.4,
+          9.5
+        ],
+        "axis_direction": [
+          0.0,
+          -1.0,
+          2.220446049250313e-16
+        ]
+      },
+      {
+        "radius": 4.8,
+        "axis_position": [
+          25.3,
+          9.9,
+          2.9000000000000004
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 4.8,
+        "axis_position": [
+          -25.3,
+          9.9,
+          2.9000000000000004
+        ],
+        "axis_direction": [
+          0.0,
+          0.0,
+          1.0
+        ]
+      },
+      {
+        "radius": 5.6,
+        "axis_position": [
+          -20.2,
+          36.9,
+          10.6
+        ],
+        "axis_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 19.2,
+        "axis_position": [
+          -20.2,
+          32.111542149718574,
+          35.4
+        ],
+        "axis_direction": [
+          -1.0,
+          -0.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          35.2,
+          4.199999999999999,
+          5.8
+        ],
+        "axis_direction": [
+          -1.0,
+          -0.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -16.530473371706403,
+          18.620377987319767,
+          22.748544346623067
+        ],
+        "axis_direction": [
+          -0.1853376954896506,
+          0.7413507819586024,
+          -0.6450185708333941
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -17.1182715860201,
+          20.971570844574536,
+          24.424476362889735
+        ],
+        "axis_direction": [
+          0.16193188173447415,
+          -0.6477275269378966,
+          -0.7444643151453592
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          16.530473371706414,
+          18.620377987319763,
+          22.748544346623067
+        ],
+        "axis_direction": [
+          0.1853376954896506,
+          0.7413507819586024,
+          -0.6450185708333941
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          17.118271586020107,
+          20.971570844574536,
+          24.42447636288973
+        ],
+        "axis_direction": [
+          -0.16193188173447415,
+          -0.6477275269378966,
+          -0.7444643151453592
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -32.134314575050766,
+          2.6000000000000005,
+          17.934314575050763
+        ],
+        "axis_direction": [
+          -0.7071067811865476,
+          -0.0,
+          -0.7071067811865476
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -32.36862915010154,
+          0.0,
+          17.7
+        ],
+        "axis_direction": [
+          -0.0,
+          1.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          34.634314575050766,
+          2.6000000000000005,
+          15.434314575050761
+        ],
+        "axis_direction": [
+          -0.7071067811865476,
+          0.0,
+          0.7071067811865476
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          32.7,
+          2.6,
+          17.7
+        ],
+        "axis_direction": [
+          -1.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          32.368629150101526,
+          0.0,
+          17.7
+        ],
+        "axis_direction": [
+          -0.0,
+          1.0,
+          -0.0
+        ]
+      },
+      {
+        "radius": 0.8,
+        "axis_position": [
+          -17.2,
+          19.128649458720187,
+          22.306318417877243
+        ],
+        "axis_direction": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      }
+    ],
+    "insertion_corridor": "clear and widens toward entrance",
+    "sampled_clearances_mm": [
+      11.2,
+      11.2,
+      11.50679405247541,
+      12.417371773377234,
+      13.902633180508676,
+      15.915112714903145,
+      17.219193350882563
+    ],
+    "hole_spacing_and_positions": "passed",
+    "tip_from_flange_mm": 18.0,
+    "throat_gap_mm": 11.2,
+    "mouth_gap_mm": 17.22789393617269,
+    "step_volume_relative_error": 3.594672104011576e-08,
+    "step_roundtrip": "passed",
+    "stl_watertight": true,
+    "stl_winding_consistent": true,
+    "stl_volume_relative_error": 2.9463978011704007e-05,
+    "render_iso": {
+      "render_mode": "3d"
+    },
+    "render_top": {
+      "render_mode": "3d"
+    },
+    "render_side": {
+      "render_mode": "3d"
+    },
+    "render_front": {
+      "render_mode": "3d"
+    }
+  }
+}

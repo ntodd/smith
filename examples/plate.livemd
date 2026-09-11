@@ -1,0 +1,52 @@
+# A plate, step by step
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Start with a blank
+
+Lengths are millimeters. Each stage is a reusable recipe; evaluating one does not
+change any earlier stage. Drag the preview to rotate, scroll to zoom, or download PNG.
+
+```elixir
+blank = Smith.box(60, 40, 5)
+{:ok, preview} = Smith.Kino.render(blank, label: "1 · Blank")
+preview
+```
+
+## Round the corners
+
+Select the four vertical edges. The expected count catches an unintended selection
+if you later change the design.
+
+```elixir
+rounded = blank |> Smith.fillet(edges: {:parallel, :z}, count: 4, radius: 2)
+{:ok, preview} = Smith.Kino.render(rounded, label: "2 · Rounded corners")
+preview
+```
+
+## Drill the plate
+
+The top-face shortcut places the hole at that face's area centroid.
+
+```elixir
+finished = rounded |> Smith.hole(on: :top, diameter: 8, through: :all)
+{:ok, result} = Smith.evaluate(finished)
+{:ok, preview} = Smith.Kino.render(result, label: "3 · Through hole")
+preview
+```
+
+## Check and export
+
+The analytic volume is a rectangular plate minus four rounded corner cutouts and
+a cylindrical bore. Export additionally verifies topology, the printable mesh,
+and a STEP round trip. Inspect the returned paths for STL and 3MF.
+
+```elixir
+{:ok, volume} = OCEx.volume(result.shape)
+expected = (60 * 40 - (4 - :math.pi()) * 2 * 2 - :math.pi() * 4 * 4) * 5
+true = abs(volume - expected) < 1.0e-6
+{:ok, files} = Smith.export(result, "output/livebook", name: "plate", on_bed: true)
+files
+```
