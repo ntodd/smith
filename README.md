@@ -4,8 +4,6 @@ Smith is an Elixir CAD library. Build sketches, solids, and named assemblies wit
 
 Smith uses [OCEx](https://hexdocs.pm/ocex). The geometry engine is Open CASCADE Technology (OCCT) 7.9.3.
 
-![A rounded plate with a through hole, rendered by Smith in Livebook](guides/images/plate.png)
-
 ## A printable part in one script
 
 Install the native toolkit using the [installation guide](https://hexdocs.pm/ocex/installation.html), then save this as `mount.exs`:
@@ -26,6 +24,10 @@ model =
 {:ok, files} = Smith.export(result, "output", name: "mount", on_bed: true)
 IO.puts(files.three_mf)
 ```
+
+<div class="smith-doc-preview" data-preview="mount" data-model="result" data-label="Mounting plate">
+<p><img src="guides/images/plate.png" alt="A mounting plate with two holes"></p>
+</div>
 
 Run `elixir mount.exs`. The output bundle includes STEP, BREP, binary STL, and 3MF files, plus a report of the mesh and STEP checks. Every export gets a new directory; earlier exports remain available. 3MF contains printable geometry, without printer or slicer settings.
 

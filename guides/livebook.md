@@ -34,6 +34,11 @@ Without it, `Smith.Kino.render/2` raises with reason `:kino_not_available`. For 
 notebook previously compiled without Kino, restart its runtime and use
 `Mix.install(deps, force: true)` once, then remove `force: true` for normal use.
 
+The previews on this page use the same renderer as Livebook. Their meshes are
+built from the guide's examples when the documentation is generated. You can
+inspect them here without installing Elixir; open the notebook to edit a recipe
+and rebuild its geometry.
+
 ## Show each stage
 
 Use separate cells for these steps. `render/2` returns the Kino directly, so the
@@ -44,16 +49,28 @@ blank = Smith.box(60, 40, 5)
 Smith.Kino.render(blank, label: "1 · Blank")
 ```
 
+<div class="smith-doc-preview" data-preview="plate-blank" data-model="blank" data-label="Blank">
+<p>Interactive 3D preview available in HexDocs.</p>
+</div>
+
 ```elixir
 rounded = blank |> Smith.fillet(edges: {:parallel, :z}, radius: 2)
 Smith.Kino.render(rounded, label: "2 · Rounded corners")
 ```
+
+<div class="smith-doc-preview" data-preview="plate-rounded" data-model="rounded" data-label="Rounded corners">
+<p>Interactive 3D preview available in HexDocs.</p>
+</div>
 
 ```elixir
 finished = rounded |> Smith.hole(on: :top, diameter: 8, through: :all)
 {:ok, result} = Smith.evaluate(finished)
 Smith.Kino.render(result, label: "3 · Drilled plate")
 ```
+
+<div class="smith-doc-preview" data-preview="plate-drilled" data-model="result" data-label="Drilled plate">
+<p>Interactive 3D preview available in HexDocs.</p>
+</div>
 
 Drag to rotate and scroll to zoom. **Fullscreen** expands the preview to the screen
 while retaining the current camera and controls. Choose **Exit fullscreen** or press

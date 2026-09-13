@@ -43,7 +43,7 @@ export function init(ctx, data) {
     const active = document.fullscreenElement === panel;
     fullscreen.textContent = active ? "Exit fullscreen" : "Fullscreen";
     fullscreen.setAttribute("aria-pressed", String(active));
-    fullscreen.title = active ? "Return to the notebook (Esc)" : "Show the 3D preview fullscreen";
+    fullscreen.title = active ? "Exit fullscreen (Esc)" : "Show the 3D preview fullscreen";
   });
   const gl = canvas.getContext("webgl", {antialias: true, preserveDrawingBuffer: true});
   if (!gl) { caption.textContent = "WebGL is unavailable in this browser."; save.disabled = true; reset.disabled = true; return; }

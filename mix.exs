@@ -12,14 +12,25 @@ defmodule Smith.MixProject do
       source_url: "https://github.com/ntodd/smith",
       homepage_url: "https://hexdocs.pm/smith",
       deps: deps(),
+      aliases: [docs: ["run scripts/build-doc-previews.exs", "docs"]],
       package: [
         licenses: ["MIT"],
         links: %{"GitHub" => "https://github.com/ntodd/smith"},
-        files: ~w(lib priv guides examples mix.exs .formatter.exs README.md CHANGELOG.md LICENSE)
+        files:
+          ~w(lib priv guides examples scripts/build-doc-previews.exs mix.exs .formatter.exs README.md CHANGELOG.md LICENSE)
       ],
       docs: [
         main: "readme",
-        assets: %{"guides/images" => "guides/images", "guides/figures" => "figures"},
+        assets: %{
+          "guides/images" => "guides/images",
+          "guides/figures" => "figures",
+          ".doc-preview-assets" => "preview/models",
+          "priv/docs" => "preview",
+          "priv/kino" => "preview/renderer"
+        },
+        before_closing_body_tag: %{
+          html: ~s(<script type="module" src="preview/docs.js"></script>)
+        },
         source_ref: "v0.1.0",
         source_url_pattern: "https://github.com/ntodd/smith/blob/v0.1.0/%{path}#L%{line}",
         extras: [

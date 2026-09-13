@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Embed the shared 3D renderer in HexDocs, with meshes generated from the documented examples.
+
 ## 0.1.0
 
 - Return Kino previews directly and accept piped evaluation/view results; preview failures raise with their reason.

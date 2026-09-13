@@ -34,6 +34,10 @@ model =
   )
 ```
 
+<div class="smith-doc-preview" data-preview="assembly-installed" data-model="result" data-label="Installed assembly">
+<p>Interactive 3D preview available in HexDocs.</p>
+</div>
+
 Identical recipe terms reused as instances are evaluated once per `Smith.evaluate/1` call. Each instance receives its own installed transform. There is no global cache or assembly process.
 
 ## Inspection views
@@ -41,10 +45,13 @@ Identical recipe terms reused as instances are evaluated once per `Smith.evaluat
 Build a snapshot from an evaluated assembly, then render it:
 
 ```elixir
-result
-|> Smith.Assembly.view(:exploded)
-|> Smith.Kino.render(label: "Exploded assembly")
+exploded = Smith.Assembly.view(result, :exploded)
+Smith.Kino.render(exploded, label: "Exploded assembly")
 ```
+
+<div class="smith-doc-preview" data-preview="assembly-exploded" data-model="exploded" data-label="Exploded assembly">
+<p>Interactive 3D preview available in HexDocs.</p>
+</div>
 
 The default `:installed` mode retains the installed compound. `:display` shows all
 manufactured leaves, including printable extras, with accumulated display offsets.

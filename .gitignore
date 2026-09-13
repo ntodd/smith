@@ -11,3 +11,5 @@ output/
 
 .occt/
 .ci/
+
+.doc-preview-assets/
