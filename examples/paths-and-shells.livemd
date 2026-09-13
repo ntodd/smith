@@ -1,0 +1,97 @@
+# Smith — Paths, smooth lofts, and hollow parts
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). All dimensions below are millimeters. Each preview can be rotated, zoomed, opened fullscreen, or downloaded as a PNG.
+
+Restart the Livebook runtime after changing dependencies or native code.
+
+This notebook builds three independent printable parts: an open tray, a curved rod, and a smooth transition. Recipes remain ordinary Elixir values, so changing a dimension and reevaluating dependent cells rebuilds the design.
+
+## Start with a tray blank
+
+```elixir
+alias Smith.{Assembly, Path, Plane, Selector, Sketch}
+
+blank = Smith.box(40, 30, 18)
+Smith.Kino.render(blank, label: "1 · Tray blank")
+```
+
+## Select the opening and hollow the tray
+
+The selector looks for outward +Z planar faces, then keeps the highest area centroid. `count: 1` makes an ambiguous selection fail. Negative thickness builds inward, preserving the exterior dimensions and leaving a floor.
+
+```elixir
+top = Selector.type(:plane) |> Selector.facing(:z) |> Selector.at_max(:z)
+tray = blank |> Smith.shell(openings: top, thickness: -2, count: 1)
+{:ok, tray_result} = Smith.evaluate(tray)
+{:ok, volume} = OCEx.volume(tray_result.shape)
+true = abs(volume - (40 * 30 * 18 - 36 * 26 * 16)) < 1.0e-6
+Smith.Kino.render(tray_result, label: "2 · Tray with 2 mm walls and floor")
+```
+
+## Sweep around a bend
+
+The quarter-circle path starts at `{20, 0, 0}` and points along +Y. The section is a 2 mm radius circle on XZ, centered at that starting point. Its plane is perpendicular to the starting tangent. Smith retains this explicit placement.
+
+```elixir
+path = Path.new([Smith.arc({0, 0, 0}, {0, 0, 1}, {1, 0, 0}, 20, 0, 90)])
+bend = Sketch.circle(2, on: Plane.xz(), at: {20, 0}) |> Smith.sweep(path)
+{:ok, bend_result} = Smith.evaluate(bend)
+{:ok, volume} = OCEx.volume(bend_result.shape)
+true = abs(volume - 40 * :math.pi() * :math.pi()) < 1.0e-5
+Smith.Kino.render(bend_result, label: "3 · Quarter-circle sweep")
+```
+
+A path can also contain connected lines and interpolated splines. Directed endpoints must meet in order. Prefer tangent-continuous paths; sharp corners need an explicit transition choice and inspection. Sweeps currently require an open path and a profile without holes.
+
+## Compare ruled and smooth lofts
+
+Both models use the same three sections. The ruled version joins each pair directly; the smooth version interpolates through all three. Smooth interpolation can extend beyond the intermediate dimensions between sections.
+
+```elixir
+sections = [
+  Sketch.circle(6),
+  Sketch.circle(12, on: Plane.xy(z: 15)),
+  Sketch.circle(8, on: Plane.xy(z: 30))
+]
+ruled = Smith.loft(sections)
+Smith.Kino.render(ruled, label: "4 · Ruled loft")
+```
+
+```elixir
+smooth = Smith.loft(sections, ruled: false)
+Smith.Kino.render(smooth, label: "5 · Smooth loft")
+```
+
+## Put the parts together for inspection
+
+Named assembly parts retain independent print placement. The positions below spread them out for comparison. They do not fuse the parts.
+
+```elixir
+assembly =
+  Assembly.new(:modeling_milestone)
+  |> Assembly.part(:tray, tray, print: [on_bed: true])
+  |> Assembly.part(:bend, bend, position: {55, 0, 2}, print: [on_bed: true])
+  |> Assembly.part(:transition, smooth, position: {100, 15, 0}, print: [on_bed: true])
+{:ok, assembly_result} = Smith.evaluate(assembly)
+Smith.Kino.render(assembly_result, label: "6 · Three finished parts")
+```
+
+## Export STL and 3MF
+
+This writes separate verified part bundles, assembly STEP, and a ZIP containing the printable STL/3MF pairs. `files.print_pack` is the path to that ZIP on the Livebook runtime's machine. Files use 0.03 mm linear and 0.1 rad angular mesh deflection; they contain geometry, without slicer presets.
+
+```elixir
+{:ok, files} = Smith.export(assembly_result, "output/models",
+  name: "modeling-milestone", tolerance: 0.03, angular_tolerance: 0.1)
+files.print_pack
+```
+
+The tray volume and bend volume were checked against independent formulas above. Export adds mesh connectivity and winding checks plus a STEP volume round trip. These checks do not prove wall strength, fit, or support-free printing. Inspect the smooth transition and choose print orientation and supports in your slicer.
+
+Try changing the tray wall thickness, the bend radius and matching profile position, or the middle loft section. Keep the analytical assertions consistent with your dimensions. An excessive inward shell thickness should fail; reducing the wall or simplifying a tight detail can make the design feasible.

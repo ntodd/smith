@@ -66,7 +66,7 @@ Sketch.profile([
 |> Smith.extrude(3)
 ```
 
-`Sketch.line/2` and `arc/4` return edge descriptions for `profile/2`. Arc arguments are center, radius, start angle, and signed sweep. Positive angles turn counterclockwise in the local XY frame. Closure and topology are checked by the native kernel.
+`Sketch.line/2`, `arc/4`, and `spline/2` return edge descriptions for `profile/2`. Arc arguments are center, radius, start angle, and signed sweep. Positive angles turn counterclockwise in the local XY frame. Closure and topology are checked by the native kernel.
 
 `Sketch.on(sketch, plane)` reuses an outline in a different frame without changing the original:
 
@@ -77,6 +77,10 @@ side = outline |> Sketch.on(Plane.yz(x: 25)) |> Smith.extrude(3)
 ```
 
 ## Corners and extrusion
+
+Use `Smith.extrude/3` for symmetric depth (`both: true`) or wall taper in degrees
+(`taper: 5`). Use `Smith.extrude_until/3` to terminate at an infinite plane.
+The [extrusion guide](extrusion.html) explains extent, hole behavior, and limits.
 
 `Sketch.fillet(sketch, radius: r)` sets a uniform 2D corner radius on a rectangle or strictly convex polygon. Calling it again replaces the radius. It constructs tangent lines and circular arcs, accounting for each corner angle and either polygon winding. The radius must leave a positive straight segment between adjacent arcs. Concave polygons, collinear/degenerate corners, arbitrary arc profiles, circles, and overlapping fillets are rejected. Fillets apply to the original outline, before any sketch cuts, regardless of call order. They do not round corners introduced by a cut. Sketch constraint solving and general corner editing remain unsupported.
 
@@ -106,7 +110,7 @@ A cutter without `on:` or `Sketch.on/2` inherits its parent's frame, including i
 
 The result must be one connected face, optionally containing multiple holes. Empty and disconnected results fail with `:empty_sketch` and `:disconnected_sketch`; mismatched planes fail with `:non_coplanar_sketches`. Use separate sketches and solids when a design needs disconnected regions. Invalid cutter inputs also return tagged evaluation errors.
 
-## Revolve and ruled loft
+## Revolve and loft
 
 ```elixir
 # A sleeve formed by rotating an XZ cross-section about world Z.
@@ -123,7 +127,7 @@ transition =
 
 `Smith.revolve(profile, axis, degrees \\ 360, origin \\ {0, 0, 0})` accepts a sketch, including cutouts, or an existing world-coordinate face recipe. Axis and origin are world coordinates, consistent with `Smith.rotate/4`. Angles must be greater than zero and at most 360 degrees; reverse the axis vector for the opposite direction. Place the cross-section on one side of the rotation axis so its sweep forms a valid solid. Partial revolutions include end faces.
 
-`Smith.loft(sketches)` takes at least two ordered sketches on their respective planes. It produces a **ruled** solid: each adjacent pair is connected directly, without smoothing across intermediate sections. Rectangles, circles, polygons, rounded outlines, and line/arc profiles are supported. Each section must have one closed boundary; a sketch with holes fails with `:loft_profile_has_holes`. Edge cutouts that retain a single boundary are supported. The kernel determines edge correspondence; there are no seam controls, guide rails, or smooth-loft options. Degenerate or invalid solids fail during evaluation.
+`Smith.loft(sketches, opts)` takes at least two ordered sketches on their respective planes. By default it produces a **ruled** solid: each adjacent pair is connected directly, without smoothing across intermediate sections. Rectangles, circles, polygons, rounded outlines, and line/arc/spline profiles are supported. Each section must have one closed boundary; a sketch with holes fails with `:loft_profile_has_holes`. Edge cutouts that retain a single boundary are supported. The kernel determines edge correspondence; there are no seam controls or guide rails. Set `ruled: false` to interpolate smoothly through the sections; the result may overshoot between them. See [paths, lofts, and shells](paths-and-shells.md) for an example. Degenerate or invalid solids fail during evaluation.
 
 Both return model recipes for further transformations, booleans, assembly placement, and printable export.
 
@@ -131,7 +135,7 @@ Open the [Livebook examples](livebook.md) to inspect each modeling stage and gen
 
 ## Holes
 
-`Smith.hole(model, on: plane, at: {u, v}, diameter: d, through: :all)` drills along the plane normal through its local point. `at:` defaults to `{0, 0}`. The cutter spans the body's projected world bounds, including disconnected solids; the plane itself may lie outside the body. A hole that removes no material fails with `:hole_misses_body`. No blind-depth mode is implemented.
+`Smith.hole(model, on: plane, at: {u, v}, diameter: d, through: :all)` drills along the plane normal through its local point. `at:` defaults to `{0, 0}`. The cutter spans the body's projected world bounds, including disconnected solids; the plane itself may lie outside the body. A hole that removes no material fails with `:hole_misses_body`. Use `depth:` instead of `through:` for a flat-bottomed blind hole into the negative plane normal. See [mechanical parts](mechanical-parts.md) for entry placement and recessed holes.
 
 `on: :top` selects the highest outward +Z planar face, positions relative to its area centroid, and drills along world Z. Earlier cuts can move that centroid; use a fixed plane when hole coordinates must remain fixed. Explicit planes do not select or attach to a face and do not resolve topology names.
 

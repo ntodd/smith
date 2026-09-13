@@ -1,0 +1,137 @@
+# Smith — Attach parts and pose joints
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install the pinned toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing native code.
+
+This notebook builds a base and an arm, defines their attachment frames, and creates several poses from the same immutable recipe. Units are millimeters and degrees. Each preview supports rotation, zoom, fullscreen, and PNG download. The final export contains the base and arm as separate printable parts.
+
+## Build the parts
+
+The arm's pivot is 4 mm from its left end. Both bores have a 3 mm diameter. The pin is reference geometry, so it will not become a printed part. These are joint-placement examples, not a complete retained hinge design.
+
+```elixir
+alias Smith.{Assembly, Plane, Sketch}
+
+base = Sketch.rounded_rectangle(20, 20, 2)
+  |> Smith.extrude(4)
+  |> Smith.hole(on: Plane.xy(z: 4), diameter: 3, through: :all)
+arm = Sketch.rounded_rectangle(40, 8, 2, align: {:min, :center})
+  |> Smith.extrude(3)
+  |> Smith.hole(on: Plane.xy(z: 3), at: {4, 0}, diameter: 3, through: :all)
+
+Smith.Kino.render(arm, label: "1 · Arm and pivot bore")
+```
+
+## Name the attachment frames
+
+`on:` names an immediate member, and `at:` defines a plane in that member's original recipe coordinates. Placement follows afterwards. The base frame is 0.4 mm above the base top; the arm frame lies at its pivot on the bottom face. Both normals point along +Z, and both X axes point along +X.
+
+```elixir
+fixture = Assembly.new(:hinge)
+  |> Assembly.part(:base, base, print: [on_bed: true])
+  |> Assembly.part(:arm, arm, position: {30, 0, 10}, print: [on_bed: true],
+    exploded_offset: {0, 0, 12})
+  |> Assembly.reference(:pin, Smith.cylinder(1.4, 9))
+  |> Assembly.joint(:base_axis, on: :base, at: Plane.xy(z: 4.4))
+  |> Assembly.joint(:arm_axis, on: :arm, at: Plane.xy(origin: {4, 0, 0}))
+
+{:ok, unconnected} = Smith.evaluate(fixture)
+Smith.Kino.render(unconnected, label: "2 · Parts before connection")
+```
+
+A joint is a frame, not a topology handle. It stays tied to the member's recipe coordinates, so changing a hole location also requires updating its attachment frame. Define shared dimensions once when building a parameterized design.
+
+## Connect and rotate
+
+The source moves to the target. A revolute connection rotates about the target's local Z axis. The source's initial placement is overridden. Limits are inclusive; values outside them fail instead of being clamped. Positive angles follow the right-hand rule.
+
+```elixir
+poses = for angle <- [0, 45, 90] do
+  recipe = Assembly.connect(fixture, :arm_axis,
+    to: :base_axis, kind: :revolute, angle: angle, limits: [angle: {-90, 90}])
+  {:ok, result} = Smith.evaluate(recipe)
+  {:ok, joint} = Assembly.fetch_joint(result, :arm_axis)
+  {x, y, z} = joint.frame.origin
+  true = abs(x) < 1.0e-7 and abs(y) < 1.0e-7 and abs(z - 4.4) < 1.0e-7
+  {:ok, part} = Assembly.fetch(result, :arm)
+  {:ok, volume} = OCEx.volume(part.shape)
+  expected = (40 * 8 - (4 - :math.pi()) * 4 - :math.pi() * 1.5 * 1.5) * 3
+  true = abs(volume - expected) < 1.0e-5
+  {angle, result}
+end
+
+poses |> Enum.map(fn {angle, result} ->
+  Smith.Kino.render(result, label: "3 · Arm at #{angle}°")
+end) |> Kino.Layout.grid(columns: 1)
+```
+
+Each pose starts from `fixture`. Appending another connection to an already-connected source would give that member two controlling connections and fail. Use a function or comprehension to create variants from the unconnected recipe.
+
+## Inspect alignment and clearance
+
+The returned frame has an origin and three world-space unit axes: `u`, `v`, and `n`. A connection aligns the complete frame, without an implicit reversal of the normal. Use opposing local planes if your mounting convention requires face-to-face alignment.
+
+```elixir
+{45, selected} = Enum.find(poses, fn {angle, _} -> angle == 45 end)
+{:ok, pivot} = Assembly.fetch_joint(selected, :arm_axis)
+{:ok, moving} = Assembly.fetch(selected, :arm)
+{:ok, fixed} = Assembly.fetch(selected, :base)
+{:ok, {arm_low, _}} = OCEx.bounds(moving.shape)
+{:ok, {_, base_high}} = OCEx.bounds(fixed.shape)
+clearance = elem(arm_low, 2) - elem(base_high, 2)
+true = abs(clearance - 0.4) < 1.0e-7
+Kino.DataTable.new([%{origin: inspect(pivot.frame.origin),
+  axis: inspect(pivot.frame.n), clearance_mm: clearance}])
+```
+
+Joint evaluation calculates placement. It does not check collisions, strength, or travel clearance. The check above verifies vertical separation of the parts' bounds in this pose. A mechanism with a range of motion needs checks across that range.
+
+## Other motion types
+
+Rigid connections have no motion coordinates. Linear joints translate along target-local Z. Cylindrical joints combine that translation with rotation about Z. Ball joints take three angles around the fixed target X, then Y, then Z axes. The examples below demonstrate transforms on the same arm; they do not change its geometry into a physical slider or ball socket.
+
+```elixir
+variants = [
+  {"Rigid", [kind: :rigid]},
+  {"Linear · 8 mm", [kind: :linear, offset: 8, limits: [offset: {0, 10}]]},
+  {"Cylindrical · 45°, 8 mm", [kind: :cylindrical, angle: 45, offset: 8]},
+  {"Ball · tilted arm", [kind: :ball, angles: {20, 0, 30}, limits: [x: {-30, 30}]]}
+]
+variants |> Enum.map(fn {label, opts} ->
+  recipe = Assembly.connect(fixture, :arm_axis, [to: :base_axis] ++ opts)
+  Smith.Kino.render(recipe, label: label)
+end) |> Kino.Layout.grid(columns: 2)
+```
+
+Dependencies resolve target-first even when connections are declared in another order. Each moving member can have only one controlling connection. Cycles and self-connections fail. Inside a subassembly, local connections resolve first; connecting `[:module, :pin]` at its parent level then moves the **whole module**, retaining its internal pose. This is directed assembly placement, not a solver for closed linkages.
+
+## Inspect the connected parts apart
+
+The exploded view starts with the selected joint pose. It lifts the arm 12 mm
+along world Z and retains its 45° rotation. The connection and installed result
+remain unchanged; no part recipe is evaluated again.
+
+```elixir
+{:ok, exploded} = Assembly.view(selected, :exploded)
+Smith.Kino.render(exploded, label: "Exploded · Arm at 45°")
+```
+
+## Export a pose
+
+The installed STEP captures the selected 45° pose. STL and 3MF files use each leaf's print placement. The report includes joint frames, connection parameters, and the tree's resolved world poses. Reference geometry remains separate.
+
+```elixir
+{:ok, files} = Smith.export(selected, "output/models", name: "joint-hinge",
+  angular_tolerance: 0.1)
+2 = length(files.parts)
+[%{kind: :revolute, values: %{angle: 45}}] = files.connections
+{:ok, printable_files} = :zip.extract(File.read!(files.print_pack), [:memory])
+4 = length(printable_files)
+true = Enum.all?(files.parts, & &1.verification.mesh.watertight)
+Kino.Text.new(files.print_pack)
+```

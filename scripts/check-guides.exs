@@ -33,7 +33,7 @@ try do
 
         for {name, value} <- binding do
           case value do
-            %{__struct__: module} when module in [Smith.Model, Smith.Sketch, Smith.Assembly] ->
+            %{__struct__: module} when module in [Smith.Model, Smith.Sketch, Smith.Assembly, Smith.Path] ->
               case Smith.evaluate(value) do
                 {:ok, _} -> :ok
                 error -> raise "#{path}:#{line}: #{name} failed evaluation: #{inspect(error)}"

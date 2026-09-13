@@ -9,6 +9,8 @@ Mix.install([{:smith, path: Path.expand("..", __DIR__)}] ++ ocex)
 
 defmodule Models.PlantStand do
   @moduledoc "Plant tray insert v04, reconstructed as an Elixir recipe. Units: mm."
+  alias Smith.Selector
+
   defstruct diameter: 247.65,
             height: 19.05,
             deck: 5.0,
@@ -46,11 +48,15 @@ defmodule Models.PlantStand do
     |> Smith.cut(drain_slots(p))
     |> Smith.fuse(spokes(p))
     |> Smith.fillet(
-      edges: &slot_corner?(&1, p),
+      edges: Selector.parallel(:z) |> Selector.where(&(radial(&1.midpoint) < p.diameter / 2 - 1)),
       radius: 2.0,
       count: length(slot_radii(p)) * p.spokes * 4
     )
-    |> Smith.chamfer(edges: &rim_edge?(&1, p), distance: p.rim_chamfer, count: 2)
+    |> Smith.chamfer(
+      edges: Selector.type(:circle) |> Selector.radius(p.diameter / 2, tolerance: 1.0e-6),
+      distance: p.rim_chamfer,
+      count: 2
+    )
   end
 
   @doc "Annular cutters spaced from the hub toward the rim."
@@ -65,8 +71,10 @@ defmodule Models.PlantStand do
   @doc "Radial deck spokes, clipped to the circular envelope."
   def spokes(p) do
     for angle <- angles(p.spokes) do
-      Smith.box(p.diameter / 2, p.spoke_width, p.deck)
-      |> Smith.translate({0, -p.spoke_width / 2, deck_bottom(p)})
+      Smith.box(p.diameter / 2, p.spoke_width, p.deck,
+        at: {0, 0, deck_bottom(p)},
+        align: {:min, :center, :min}
+      )
       |> Smith.rotate({0, 0, 1}, angle)
       |> Smith.common(deck_blank(p))
     end
@@ -96,22 +104,25 @@ defmodule Models.PlantStand do
   end
 
   defp deck_blank(p) do
-    Smith.cylinder(p.diameter / 2, p.deck)
-    |> Smith.translate({0, 0, deck_bottom(p)})
+    Smith.cylinder(p.diameter / 2, p.deck, at: {0, 0, deck_bottom(p)})
   end
 
   defp rib(p) do
     length = p.foot_radius_position + p.foot_length / 2
 
-    Smith.box(length, p.spoke_width, p.rib_depth)
-    |> Smith.translate({0, -p.spoke_width / 2, rib_bottom(p)})
+    Smith.box(length, p.spoke_width, p.rib_depth,
+      at: {0, 0, rib_bottom(p)},
+      align: {:min, :center, :min}
+    )
   end
 
   defp outer_foot(p), do: foot(p, p.foot_radius_position, p.foot_length)
 
   defp foot(p, radius, length) do
-    Smith.box(length, p.spoke_width, rib_bottom(p))
-    |> Smith.translate({radius - length / 2, -p.spoke_width / 2, 0})
+    Smith.box(length, p.spoke_width, rib_bottom(p),
+      at: {radius, 0, 0},
+      align: {:center, :center, :min}
+    )
   end
 
   defp round_roots(model, p) do
@@ -121,14 +132,6 @@ defmodule Models.PlantStand do
       count: p.spokes + 2 * p.intermediate_foot_count + 1
     )
   end
-
-  defp slot_corner?(%{type: :line, direction: {_, _, z}, midpoint: midpoint}, p),
-    do: abs(z) > 1 - 1.0e-9 and radial(midpoint) < p.diameter / 2 - 1
-
-  defp slot_corner?(_, _), do: false
-
-  defp rim_edge?(%{type: :circle, radius: radius}, p), do: near(radius, p.diameter / 2)
-  defp rim_edge?(_, _), do: false
 
   defp root_edge?(%{bounds: {{_, _, low}, {_, _, high}}} = edge, p),
     do: near(low, rib_bottom(p)) and near(high, rib_bottom(p)) and root_shoulder?(edge, p)

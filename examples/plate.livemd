@@ -11,19 +11,20 @@ change any earlier stage. Drag the preview to rotate, scroll to zoom, or downloa
 
 ```elixir
 blank = Smith.box(60, 40, 5)
-{:ok, preview} = Smith.Kino.render(blank, label: "1 · Blank")
-preview
+Smith.Kino.render(blank, label: "1 · Blank")
 ```
 
 ## Round the corners
 
-Select the four vertical edges. The expected count catches an unintended selection
-if you later change the design.
+Select the four vertical edges with a reusable query. Smith resolves the query
+against the body at this step; `count:` catches an unintended selection if you
+change the design. You can add filters to the query with a pipeline.
 
 ```elixir
-rounded = blank |> Smith.fillet(edges: {:parallel, :z}, count: 4, radius: 2)
-{:ok, preview} = Smith.Kino.render(rounded, label: "2 · Rounded corners")
-preview
+alias Smith.Selector
+vertical = Selector.parallel(:z)
+rounded = blank |> Smith.fillet(edges: vertical, count: 4, radius: 2)
+Smith.Kino.render(rounded, label: "2 · Rounded corners")
 ```
 
 ## Drill the plate
@@ -33,8 +34,7 @@ The top-face shortcut places the hole at that face's area centroid.
 ```elixir
 finished = rounded |> Smith.hole(on: :top, diameter: 8, through: :all)
 {:ok, result} = Smith.evaluate(finished)
-{:ok, preview} = Smith.Kino.render(result, label: "3 · Through hole")
-preview
+Smith.Kino.render(result, label: "3 · Through hole")
 ```
 
 ## Check and export

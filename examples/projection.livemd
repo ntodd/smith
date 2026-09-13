@@ -1,0 +1,128 @@
+# Smith — Project an outline onto a surface
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install the pinned toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
+Restart the Livebook runtime after changing native code.
+Units are millimeters. Each surface preview supports rotation, zoom, fullscreen,
+and PNG download.
+
+Projection produces curves. This notebook fills a single planar result to build
+a printable part, compares parallel and conical projection, and measures curves
+projected onto a cylinder. Earlier recipes remain reusable.
+
+## Define the source and target
+
+The source is a circle above the target plane `z = -x`. Projecting along world Z
+produces an ellipse on that inclined plane. Preview each surface separately.
+
+```elixir
+alias Smith.{Assembly, Plane, Selector, Sketch}
+source = Sketch.circle(4, on: Plane.xy(z: 12))
+inclined = Plane.new(normal: {1, 0, 1}, x_direction: {1, 0, -1})
+target = Sketch.rectangle(30, 30, on: inclined)
+
+for {label, recipe} <- [{"1 · Source circle", source}, {"2 · Inclined target", target}] do
+  Smith.Kino.render(recipe, label: label)
+end |> Kino.Layout.grid(columns: 2)
+```
+
+## Project and fill the outline
+
+Parallel projection is bidirectional and keeps all surface hits. Target a single
+face when you want one outline. `face/1` fills one closed planar wire; it does not
+infer holes or choose between multiple hits. The ellipse area is `π * 4² * √2`.
+
+```elixir
+outline = Smith.project(source, target, direction: {0, 0, -1})
+profile = Smith.face(outline)
+{:ok, face_result} = Smith.evaluate(profile)
+{:ok, area} = OCEx.area(face_result.shape)
+true = abs(area - 16 * :math.pi() * :math.sqrt(2)) < 1.0e-6
+Smith.Kino.render(face_result, label: "3 · Projected ellipse")
+```
+
+## Extrude the projected face
+
+Face recipes use a world displacement vector. Moving the ellipse 3 mm along Z
+makes this oblique solid. Its volume is the XY footprint area times 3 mm.
+
+```elixir
+cap = profile |> Smith.extrude({0, 0, 3})
+{:ok, cap_result} = Smith.evaluate(cap)
+{:ok, volume} = OCEx.volume(cap_result.shape)
+true = abs(volume - 48 * :math.pi()) < 1.0e-6
+Smith.Kino.render(cap_result, label: "4 · Extruded projected face")
+```
+
+## Project through a point
+
+Conical projection follows half-rays from the chosen point through the source.
+The target here is twice as far from that point as the source plane, so the circle
+radius doubles from 2 to 4 mm. Surfaces behind the point are excluded.
+
+```elixir
+enlarged = Sketch.circle(2, on: Plane.xy(z: 5))
+  |> Smith.project(Sketch.rectangle(20, 20), from: {0, 0, 10})
+  |> Smith.face()
+  |> Smith.extrude({0, 0, 3})
+{:ok, enlarged_result} = Smith.evaluate(enlarged)
+{:ok, volume} = OCEx.volume(enlarged_result.shape)
+true = abs(volume - 48 * :math.pi()) < 1.0e-6
+Smith.Kino.render(enlarged_result, label: "5 · Conical projection")
+```
+
+## Measure a projection on a curved surface
+
+This line projects onto both sides of a cylinder. The two resulting arcs remain
+curves; Kino renders surfaces, so inspect sample coordinates here. Every sample
+must lie on `x² + y² = 25` and `z = 5`. Projection uses exact native curves.
+
+```elixir
+wall = Smith.cylinder(5, 10) |> Smith.surface(Selector.type(:cylinder))
+curves = Smith.line({-3, -10, 5}, {3, -10, 5})
+  |> Smith.project(wall, direction: {0, 1, 0})
+{:ok, curves_result} = Smith.evaluate(curves)
+{:ok, edges} = Smith.edges(curves_result)
+{:ok, length} = OCEx.length(curves_result.shape)
+true = abs(length - 20 * :math.asin(3 / 5)) < 1.0e-5
+
+for {edge, index} <- Enum.with_index(edges, 1), fraction <- [0, 0.25, 0.5, 0.75, 1] do
+  {:ok, %{point: {x, y, z}}} = OCEx.edge_sample(edge, fraction)
+  true = abs(x*x + y*y - 25) < 1.0e-6 and abs(z - 5) < 1.0e-6
+  %{edge: index, fraction: fraction, x_mm: x, y_mm: y, z_mm: z}
+end |> Kino.DataTable.new()
+```
+
+Target face boundaries and holes clip the curves. Successful partial hits can
+produce open wires. A missed or failed source boundary returns `:projection_failed`.
+To project onto one side of a solid, select the target with `Smith.surface/2` first.
+
+## Export two printable parts
+
+The inclined cap is rotated −45° about Y for printing so its lower face lies flat.
+Its print footprint is elliptical; the enlarged disk's footprint is circular.
+The print pack contains two STL files and two 3MF files; use one format per part.
+
+```elixir
+sample = Assembly.new(:projection_samples)
+  |> Assembly.part(:inclined_cap, cap, position: {-12, 0, 4},
+    print: [rotation: {{0, 1, 0}, -45}, on_bed: true])
+  |> Assembly.part(:enlarged_disk, enlarged, position: {12, 0, 0}, print: [on_bed: true])
+{:ok, assembly} = Smith.evaluate(sample)
+Smith.Kino.render(assembly, label: "6 · Projection samples")
+```
+
+```elixir
+{:ok, files} = Smith.export(assembly, "output/models", name: "projection-samples",
+  angular_tolerance: 0.1)
+2 = length(files.parts)
+true = Enum.all?(files.parts, & &1.verification.mesh.watertight)
+{:ok, archive} = :zip.extract(File.read!(files.print_pack), [:memory])
+4 = length(archive)
+Kino.Text.new(files.print_pack)
+```

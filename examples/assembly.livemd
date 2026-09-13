@@ -7,19 +7,21 @@ Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
 ## Define a reusable part
 
 Use ordinary functions for features and parameters. Both instances below reuse the
-same recipe, which Smith evaluates once within this assembly evaluation.
+same recipe, which Smith evaluates once within this assembly evaluation. The
+rounded sketch sets the footprint; an explicit entry plane fixes the counterbore
+at its center. The 3 mm recess leaves 5 mm of material below the screw head.
 
 ```elixir
 defmodule NotebookParts do
   def foot(width, depth, height) do
-    Smith.box(width, depth, height)
-    |> Smith.fillet(edges: {:parallel, :z}, count: 4, radius: 1)
-    |> Smith.hole(on: :top, diameter: 5, through: :all)
+    Smith.Sketch.rounded_rectangle(width, depth, 1, align: {:min, :min})
+    |> Smith.extrude(height)
+    |> Smith.counterbore(on: Smith.Plane.xy(z: height), at: {width / 2, depth / 2},
+      diameter: 5, bore_diameter: 8, bore_depth: 3, through: :all)
   end
 end
 foot = NotebookParts.foot(12, 16, 8)
-{:ok, preview} = Smith.Kino.render(foot, label: "1 · Reusable foot")
-preview
+Smith.Kino.render(foot, label: "1 · Reusable foot")
 ```
 
 ## Place two instances
@@ -32,19 +34,48 @@ alias Smith.Assembly
 pair =
   Assembly.new(:support)
   |> Assembly.part(:left, foot, position: {-20, 0, 0}, print: [on_bed: true])
-  |> Assembly.part(:right, foot, position: {20, 0, 0}, print: [on_bed: true])
+  |> Assembly.part(:right, foot, position: {20, 0, 0}, print: [on_bed: true],
+    exploded_offset: {0, 0, 16})
   |> Assembly.reference(:device, Smith.box(28, 16, 6), position: {-8, 0, 8})
 {:ok, result} = Smith.evaluate(pair)
-{:ok, preview} = Smith.Kino.render(result, label: "2 · Installed feet")
-preview
+Smith.Kino.render(result, label: "2 · Installed feet")
+```
+
+## Inspect the members
+
+Use `Assembly.members/1` to list evaluated leaves without reaching into the
+recipe's internal fields. Each member has a path, a kind, an installed flag,
+and its evaluated result. References are listed too, but are never manufactured
+parts. The same function traverses nested assemblies.
+
+```elixir
+{:ok, members} = Assembly.members(result)
+2 = Enum.count(members, &(&1.kind == :part))
+1 = Enum.count(members, &(&1.kind == :reference))
+
+members
+|> Enum.map(fn member ->
+  %{path: member.key, kind: member.kind, installed: member.installed}
+end)
+|> Kino.DataTable.new()
+```
+
+## Inspect the exploded view
+
+Create a view from the evaluated assembly. The right foot moves up by its declared
+exploded offset; its installed and print placements stay unchanged. The view is
+a combined geometry snapshot. Keep the original assembly result for export.
+
+```elixir
+{:ok, exploded} = Assembly.view(result, :exploded)
+Smith.Kino.render(exploded, label: "3 · Exploded feet")
 ```
 
 ## Inspect a reference
 
 ```elixir
 {:ok, device} = Assembly.fetch(result, :device)
-{:ok, preview} = Smith.Kino.render(device, label: "Reference · Device")
-preview
+Smith.Kino.render(device, label: "Reference · Device")
 ```
 
 ## Export the complete assembly
@@ -58,3 +89,5 @@ installed STEP geometry, a separate reference STEP, and a ZIP of printable parts
 {:ok, files} = Smith.export(result, "output/livebook", name: "support")
 files
 ```
+
+For a reusable group of parts, use `Assembly.subassembly/4`. The [nested assembly notebook](https://github.com/ntodd/smith/blob/main/examples/nested-assemblies.livemd) covers parent/child placement, path lookup, printable extras, and per-leaf exports.

@@ -3,6 +3,17 @@ defmodule Smith.AssemblyExportTest do
   alias Smith.Assembly
   @moduletag :tmp_dir
 
+  test "rejects unevaluated assemblies and non-assembly results before writing", %{tmp_dir: root} do
+    {:ok, part} = Smith.box(1, 1, 1) |> Smith.evaluate()
+
+    for input <- [fixture(), part, nil, %{}] do
+      assert {:error, :invalid_argument} =
+               Assembly.Export.write(input, root, name: "fixture")
+    end
+
+    assert File.ls!(root) == []
+  end
+
   defp fixture do
     Assembly.new(:fixture)
     |> Assembly.part(:body, Smith.box(2, 3, 4),

@@ -1,0 +1,101 @@
+# Smith — Form, cut, and thicken
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing native code.
+
+This notebook builds a tapered blank, cuts it at a plane, and reuses a cross-section as another part. It then offsets and thickens a curved surface. Dimensions are millimeters and angles are degrees. Every preview supports rotation, zoom, fullscreen, and PNG download. The final cell exports all three solid parts as STEP, STL, and 3MF.
+
+## Draft the walls
+
+The neutral plane fixes the footprint at Z=0. Positive draft removes material in the pull direction, which defaults to the plane normal. Select the four side faces by excluding faces whose normals are parallel to Z. `count: 4` checks the selection before OCCT propagates across any tangent-connected faces.
+
+```elixir
+alias Smith.{Assembly, Plane, Selector}
+
+blank = Smith.box(20, 16, 10)
+sides = Selector.type(:plane) |> Selector.exclude(Selector.parallel(:z))
+tapered = Smith.draft(blank, faces: sides, neutral: :xy, angle: 5, count: 4)
+
+{:ok, result} = Smith.evaluate(tapered)
+{:ok, volume} = OCEx.volume(result.shape)
+t = :math.tan(5 * :math.pi() / 180)
+expected = 20 * 16 * 10 - 36 * t * 100 + 4 / 3 * t * t * 1000
+true = abs(volume - expected) < 1.0e-5
+Smith.Kino.render(result, label: "1 · Five-degree draft")
+```
+
+At height z the rectangle measures `(20 − 2zt) × (16 − 2zt)`. Integrating its area from 0 to 10 gives the volume checked above. Draft supports planar, cylindrical, and conical selected faces. Excessive angles or disappearing faces can fail; the operation does not repair every topology change.
+
+## Keep one side of a cut
+
+The plane normal points toward +Z, so `keep: :negative` retains the material below Z=6. `:positive` keeps the other side. The default, `:both`, preserves both pieces as separate solids without fusing their shared cut face.
+
+```elixir
+cut_plane = Plane.xy(z: 6)
+lower = Smith.split(tapered, cut_plane, keep: :negative)
+{:ok, lower_result} = Smith.evaluate(lower)
+{:ok, volume} = OCEx.volume(lower_result.shape)
+expected = 320 * 6 - 36 * t * 36 + 4 / 3 * t * t * 216
+true = abs(volume - expected) < 1.0e-5
+Smith.Kino.render(lower_result, label: "2 · Lower portion")
+```
+
+## Reuse the section
+
+`section` returns the filled planar cross-section, including holes. Disconnected regions remain separate faces. Translate the section to the bed and extrude along a world vector; scalar extrusion is for sketches with a local plane.
+
+```elixir
+cross_section = Smith.section(tapered, cut_plane)
+{:ok, section_result} = Smith.evaluate(cross_section)
+{:ok, area} = OCEx.area(section_result.shape)
+expected_area = (20 - 12 * t) * (16 - 12 * t)
+true = abs(area - expected_area) < 1.0e-5
+
+cap = cross_section |> Smith.translate({0, 0, -6}) |> Smith.extrude({0, 0, 2})
+{:ok, cap_result} = Smith.evaluate(cap)
+{:ok, volume} = OCEx.volume(cap_result.shape)
+true = abs(volume - expected_area * 2) < 1.0e-5
+Smith.Kino.render(cap_result, label: "3 · Section extruded into a cap")
+```
+
+A missed plane returns an empty compound. Point or edge tangencies do not create a printable section. Check for faces before extruding a section whose position is user-controlled.
+
+## Offset and thicken a curved surface
+
+`surface` selects faces and sews connected boundaries. Here it extracts the cylindrical wall without the end caps. Positive offset follows that wall's outward normal, increasing its radius from 10 to 12. Negative thickening then builds a 1 mm wall toward the inside, from radius 12 to 11. The source cylinder remains unchanged.
+
+```elixir
+wall = Smith.cylinder(10, 12) |> Smith.surface(Selector.type(:cylinder))
+sleeve = wall |> Smith.offset(2) |> Smith.thicken(-1)
+{:ok, sleeve_result} = Smith.evaluate(sleeve)
+{:ok, volume} = OCEx.volume(sleeve_result.shape)
+true = abs(volume - :math.pi() * (12 * 12 - 11 * 11) * 12) < 1.0e-5
+Smith.Kino.render(sleeve_result, label: "4 · Offset sleeve with a one-millimeter wall")
+```
+
+`offset` moves surfaces along their normals. Applied to a solid, it expands or contracts its boundary. It does **not** offset a sketch outline within its plane. `thicken` closes a face or open shell into a solid; it rejects a closed shell or an existing solid. To hollow a solid and remove a face, use `Smith.shell/2` instead. Sharp joins accept `join: :arc` or `:intersection`; offset defaults to arc, thickening to intersection. Large distances, narrow gaps, and self-intersections can fail. BREP validity is not proof that every self-intersection is absent.
+
+## Assemble and export
+
+These are three separate samples. Installed positions spread them out for inspection; each part's print placement puts it on the bed. The export verifies each mesh and its STEP round trip before updating the current manifest.
+
+```elixir
+samples =
+  Assembly.new(:forming)
+  |> Assembly.part(:base, lower, print: [on_bed: true])
+  |> Assembly.part(:cap, cap, position: {30, 0, 0}, print: [on_bed: true])
+  |> Assembly.part(:sleeve, sleeve, position: {70, 8, 0}, print: [on_bed: true])
+
+{:ok, assembly} = Smith.evaluate(samples)
+{:ok, files} = Smith.export(assembly, "output/models",
+  name: "forming", tolerance: 0.03, angular_tolerance: 0.1)
+preview = Smith.Kino.render(assembly, label: "5 · Three printable samples")
+Kino.Layout.grid([preview, Kino.Text.new(files.print_pack)])
+```
+
+Change the draft angle, cut height, or sleeve thickness and reevaluate dependent cells. Update the formulas along with the dimensions. Mesh and volume checks do not establish strength or fit: inspect the exported parts in your slicer before printing.

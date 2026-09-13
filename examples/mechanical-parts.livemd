@@ -1,0 +1,139 @@
+# Smith — Mechanical parts
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing dependencies or native code.
+
+This notebook builds a mounting plate, adds a slot and fastener features, and creates a mirrored partner. All dimensions are millimeters. Each 3D preview supports rotation, zoom, fullscreen, and PNG download. Cells retain ordinary immutable recipes, so earlier stages remain available as you refine the design.
+
+## Round the outline
+
+The outline is centered in XY. Corner rounding happens before sketch cutouts. Extrusion starts at Z=0 and finishes at Z=8.
+
+```elixir
+alias Smith.{Assembly, Plane, Selector, Sketch}
+
+outline = Sketch.rounded_rectangle(60, 40, 4)
+blank = Smith.extrude(outline, 8)
+Smith.Kino.render(blank, label: "1 · Rounded plate blank")
+```
+
+## Add a slot
+
+Slot length is the overall dimension, including the two semicircular ends. A 20 × 6 slot therefore has 14 mm straight sides and 3 mm end radii. The formula below checks the extruded volume independently of the kernel construction.
+
+```elixir
+slotted = outline |> Sketch.cut(Sketch.slot(20, 6)) |> Smith.extrude(8)
+{:ok, slotted_result} = Smith.evaluate(slotted)
+outer_area = 60 * 40 - (4 - :math.pi()) * 4 * 4
+slot_area = (20 - 6) * 6 + :math.pi() * 3 * 3
+{:ok, volume} = OCEx.volume(slotted_result.shape)
+true = abs(volume - (outer_area - slot_area) * 8) < 1.0e-5
+Smith.Kino.render(slotted_result, label: "2 · Through slot")
+```
+
+## Countersink a fixed pattern
+
+An explicit entry plane keeps the fastener positions fixed as cuts change the top face's centroid. The 90° included sink angle and diameters of 8 and 4 mm produce a 2 mm deep recess. `through: :all` drills the pilot through the full body.
+
+```elixir
+entry = Plane.xy(z: 8)
+
+fastened =
+  for x <- [-22, 22], y <- [-12, 12], reduce: slotted do
+    plate ->
+      Smith.countersink(plate,
+        on: entry,
+        at: {x, y},
+        diameter: 4,
+        sink_diameter: 8,
+        angle: 90,
+        through: :all
+      )
+  end
+
+Smith.Kino.render(fastened, label: "3 · Four countersunk fasteners")
+```
+
+## Add a counterbore and blind locating hole
+
+The counterbore has an 8 mm diameter recess, 3 mm deep, and a 4 mm through pilot. The opposite locating hole is 3 mm across and stops 4 mm below the entry plane. Blind depth runs along the negative plane normal and includes any recess. These are geometric features; choose tolerances and fastener dimensions for your own hardware.
+
+```elixir
+plate =
+  fastened
+  |> Smith.counterbore(on: entry, at: {0, -12}, diameter: 4,
+    bore_diameter: 8, bore_depth: 3, through: :all)
+  |> Smith.hole(on: entry, at: {0, 12}, diameter: 3, depth: 4)
+
+{:ok, part} = Smith.evaluate(plate)
+{:ok, volume} = OCEx.volume(part.shape)
+sink_volume = :math.pi() * (2 * 2 * 6 + 2 / 3 * (4 * 4 + 4 * 2 + 2 * 2))
+bore_volume = :math.pi() * (2 * 2 * 5 + 4 * 4 * 3)
+blind_volume = :math.pi() * 1.5 * 1.5 * 4
+expected = (outer_area - slot_area) * 8 - 4 * sink_volume - bore_volume - blind_volume
+true = abs(volume - expected) < 1.0e-5
+Smith.Kino.render(part, label: "4 · Finished plate")
+```
+
+## Inspect the topology
+
+Measured filters accept an exact target with a tolerance, or an inclusive range. `sort_by` is stable, and `take` deliberately limits its result. The returned metadata uses world coordinates. Native handles identify this evaluated revision, so reuse selectors rather than old handles when the design changes.
+
+```elixir
+rims = Selector.type(:circle) |> Selector.radius({1.5, 4})
+{:ok, edge_info} = Smith.inspect_edges(part, rims)
+true = edge_info != []
+
+largest = Selector.type(:plane) |> Selector.sort_by(:area, :desc) |> Selector.take(2)
+{:ok, face_info} = Smith.inspect_faces(part, largest)
+Enum.map(face_info, &Map.take(&1, [:area, :center, :normal]))
+```
+
+Use `Selector.any_of([a, b])` to retain either query's matches, or `Selector.exclude(query)` to remove them. Each branch starts with the preceding selection. Union removes duplicates and preserves incoming order. Extrema retain all coordinate ties; `take` can discard them.
+
+## Mirror across a positioned plane
+
+The plane at X=40 reflects the plate into a separate part at X=80. Mirroring returns just that reflected recipe; the original remains reusable. Finishing operations can follow a mirror because the reflected solid retains outward orientation.
+
+```elixir
+partner = Smith.mirror(plate, Plane.yz(x: 40))
+Smith.Kino.render(partner, label: "5 · Mirrored partner")
+```
+
+## Assemble and preview the finished parts
+
+A torus and sphere demonstrate the new centered solid primitives alongside the two plates. The torus major radius reaches its tube center; the minor radius measures the tube itself. They are separate sample parts, not attached to the plates. Print placement belongs to each assembly member.
+
+```elixir
+ring = Smith.torus(10, 2, align: {:center, :center, :min})
+ball = Smith.sphere(3, align: {:center, :center, :min})
+
+assembly =
+  Assembly.new(:mechanical_parts)
+  |> Assembly.part(:left, plate, print: [on_bed: true])
+  |> Assembly.part(:right, partner, print: [on_bed: true])
+  |> Assembly.part(:ring, ring, position: {40, 35, 0}, print: [on_bed: true])
+  |> Assembly.part(:ball, ball, position: {40, -30, 0}, print: [on_bed: true])
+
+{:ok, assembled} = Smith.evaluate(assembly)
+Smith.Kino.render(assembled, label: "6 · Mechanical sample parts")
+```
+
+## Export printable files
+
+Export writes verified STL and 3MF for each manufactured part, the installed assembly STEP, and a ZIP containing the printable pairs. The path returned below is on the Livebook runtime's machine. A 0.1 rad angular tolerance keeps the small circular features well resolved.
+
+```elixir
+{:ok, files} = Smith.export(assembled, "output/models",
+  name: "mechanical-parts", tolerance: 0.03, angular_tolerance: 0.1)
+files.print_pack
+```
+
+The formulas above check material volume, and export checks mesh connectivity/winding and STEP volume agreement. These checks do not establish strength, fit, or a print strategy. Inspect the blind floor and countersink walls in your slicer. The sphere and torus may need supports or a different manufacturing approach.
+
+Try changing a hole's depth, moving the entry plane to a side face, or selecting circular rims by radius. Keep the volume formulas consistent with dimensional changes. Giving both `depth:` and `through:` must fail rather than silently choosing one.

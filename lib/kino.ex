@@ -3,8 +3,8 @@ defmodule Smith.Kino do
   Interactive 3D previews for Livebook through Kino.JS.
 
   Add Kino alongside Smith in the notebook setup. `render/2` returns a
-  tagged Kino value; unwrap it before displaying it. Each output holds an
-  independent mesh snapshot with its own camera.
+  Kino directly; leave the call as the last expression in a Livebook cell.
+  Each output holds an independent mesh snapshot with its own camera.
 
   The renderer and controls are Smith's JavaScript/WebGL code. Kino supplies
   Livebook's asset and data integration; OCEx supplies the mesh. Rendering
@@ -12,14 +12,16 @@ defmodule Smith.Kino do
 
   Previews support rotation, zoom, fullscreen, and PNG download. They show
   one surface color and do not provide part selection, dimensions, or
-  automatic exploded assembly views. See the [Livebook guide](livebook.html)
+  automatic exploded assembly views. Use `Smith.Assembly.view/2` to create a
+  display or exploded snapshot before rendering. See the [Livebook guide](livebook.html)
   for stage-by-stage examples and local dependency setup.
   """
 
   @doc """
-  Creates an interactive preview, returning `{:ok, kino}` or a tagged error.
+  Creates an interactive preview and returns the Kino directly.
 
-  Accepts a model, sketch, assembly, or evaluated result. Recipes are
+  Accepts a model, sketch, assembly, evaluated result, or `{:ok, result}`
+  from `Smith.evaluate/1` or `Smith.Assembly.view/2`. Recipes are
   evaluated on each call; passing an existing result skips that step.
   The shape is then meshed into a snapshot. Assemblies show installed
   manufactured parts only. Sketches show their faces; edge-only recipes
@@ -32,28 +34,36 @@ defmodule Smith.Kino do
     * `:angular_tolerance` — angular mesh deflection in radians, default 0.5.
 
   Deflections must satisfy OCEx's native minimum (greater than 1.0e-7).
-  Unknown or duplicate options return `:invalid_options`. Geometry and
-  meshing failures are returned unchanged. The preview does not run the
-  print export checks.
+  Invalid options, evaluation failures, and meshing failures raise
+  `RuntimeError` with the failure reason. Passing `{:error, reason}` raises
+  the same error; modeling failures include the `Smith.Error` fields, such
+  as operation and step. To handle modeling failures yourself, match on
+  `Smith.evaluate/1` before rendering. The preview does not run the print
+  export checks.
 
   ## Display in Livebook
 
-  Unwrap the result and leave the Kino as the cell's last value:
+  Leave the render call as the cell's last expression:
 
-      iex> {:ok, preview} = Smith.Kino.render(Smith.box(20, 10, 4), label: "Blank")
+      iex> preview = Smith.Kino.render(Smith.box(20, 10, 4), label: "Blank")
       iex> is_struct(preview, Kino.JS)
       true
 
-  In a notebook, end the cell with `preview`, or pass it to
-  `Kino.render/1`. Drag to rotate, scroll to zoom, and use the toolbar for
+  Evaluation results can be piped straight into the preview:
+
+      iex> Smith.box(20, 10, 4) |> Smith.evaluate() |> Smith.Kino.render() |> is_struct(Kino.JS)
+      true
+
+  Use `Kino.render/1` to display an additional preview before the cell's
+  final expression. Drag to rotate, scroll to zoom, and use the toolbar for
   fullscreen or PNG download. PNG captures the current browser canvas;
   there is no server-side image renderer.
 
   ## Optional dependency
 
-  Smith must be compiled with Kino available. Otherwise this returns
-  `{:error, :kino_not_available}`. Add `{:kino, "~> 0.19.0"}` to the
-  same dependency list and rebuild Smith. In a notebook, restart the
+  Smith must be compiled with Kino available. Otherwise this raises
+  `RuntimeError` with reason `:kino_not_available`. Add `{:kino, "~> 0.19.0"}`
+  to the same dependency list and rebuild Smith. In a notebook, restart the
   runtime and run `Mix.install(deps, force: true)` once if Smith was
   previously compiled without Kino.
   """
@@ -62,11 +72,20 @@ defmodule Smith.Kino do
           | Smith.Sketch.t()
           | Smith.Assembly.t()
           | Smith.Result.t()
-          | Smith.Assembly.Result.t(),
+          | Smith.Assembly.Result.t()
+          | {:ok, Smith.Result.t() | Smith.Assembly.Result.t()}
+          | {:error, term()},
           keyword()
         ) ::
-          {:ok, Kino.JS.t()} | {:error, term()}
+          Kino.JS.t()
   def render(model, opts \\ []) do
+    case preview(model, opts) do
+      {:ok, kino} -> kino
+      {:error, reason} -> raise "cannot render Smith preview: #{inspect(reason)}"
+    end
+  end
+
+  defp preview(model, opts) do
     with :ok <- available(),
          :ok <- options(opts),
          {:ok, result} <- result(model),
@@ -91,6 +110,9 @@ defmodule Smith.Kino do
     if Code.ensure_loaded?(Smith.Kino.Renderer), do: :ok, else: {:error, :kino_not_available}
   end
 
+  defp result({:ok, %Smith.Result{} = result}), do: {:ok, result}
+  defp result({:ok, %Smith.Assembly.Result{} = result}), do: {:ok, result}
+  defp result({:error, _} = error), do: error
   defp result(%Smith.Result{} = result), do: {:ok, result}
   defp result(%Smith.Assembly.Result{} = result), do: {:ok, result}
   defp result(model), do: Smith.evaluate(model)

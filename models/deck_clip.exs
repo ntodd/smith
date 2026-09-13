@@ -48,8 +48,8 @@ defmodule Models.DeckClip do
     |> Smith.cut(tip_trimmers(dimensions))
     |> Smith.clean()
     |> Smith.fillet(edges: :all, radius: dimensions.edge_radius)
-    |> Smith.cut(plate_holes(dimensions))
-    |> Smith.cut(flange_holes(dimensions))
+    |> plate_holes(dimensions)
+    |> flange_holes(dimensions)
   end
 
   @doc "Extruded hook with the tight root and tapered, flared return arm."
@@ -104,33 +104,33 @@ defmodule Models.DeckClip do
   @doc "Paired cutting tools that taper the sides of the raised return arm."
   def tip_trimmers(dimensions), do: Enum.map([-1, 1], &tip_trimmer(dimensions, &1))
 
-  @doc "Through-hole and counterbore tools for each plate screw, in machining order."
-  def plate_holes(dimensions) do
-    Enum.flat_map([-dimensions.main_spacing / 2, dimensions.main_spacing / 2], fn x ->
-      [plate_hole(dimensions, x), counterbore(dimensions, x)]
+  @doc "Drill the two plate screws with flat-bottomed head recesses."
+  def plate_holes(model, dimensions) do
+    Enum.reduce([-dimensions.main_spacing / 2, dimensions.main_spacing / 2], model, fn x, body ->
+      Smith.counterbore(body,
+        on: Smith.Plane.xy(z: dimensions.plate_thickness),
+        at: {x, dimensions.flange_thickness + dimensions.hole_row_from_flange},
+        diameter: dimensions.main_diameter,
+        bore_diameter: dimensions.recess_diameter,
+        bore_depth: dimensions.recess_depth,
+        through: :all
+      )
     end)
   end
 
-  @doc "Two horizontal screw-hole tools for the mounting flange."
-  def flange_holes(dimensions) do
-    for x <- [-dimensions.flange_spacing / 2, dimensions.flange_spacing / 2] do
-      Smith.cylinder(dimensions.flange_diameter / 2, dimensions.flange_thickness + 2)
-      |> Smith.rotate({1, 0, 0}, 90)
-      |> Smith.translate({x, dimensions.flange_thickness + 1, dimensions.flange_hole_elevation})
-    end
-  end
+  @doc "Drill the flange from its front surface toward negative Y."
+  def flange_holes(model, dimensions) do
+    entry = Smith.Plane.new(origin: {0, dimensions.flange_thickness, 0}, normal: {0, 1, 0})
 
-  defp plate_hole(dimensions, x) do
-    Smith.cylinder(dimensions.main_diameter / 2, dimensions.plate_thickness + 2)
-    |> Smith.translate({x, dimensions.flange_thickness + dimensions.hole_row_from_flange, -1})
-  end
-
-  defp counterbore(dimensions, x) do
-    Smith.cylinder(dimensions.recess_diameter / 2, dimensions.recess_depth)
-    |> Smith.translate(
-      {x, dimensions.flange_thickness + dimensions.hole_row_from_flange,
-       dimensions.plate_thickness - dimensions.recess_depth}
-    )
+    Enum.reduce([-dimensions.flange_spacing / 2, dimensions.flange_spacing / 2], model, fn x,
+                                                                                           body ->
+      Smith.hole(body,
+        on: entry,
+        at: {x, -dimensions.flange_hole_elevation},
+        diameter: dimensions.flange_diameter,
+        depth: dimensions.flange_thickness
+      )
+    end)
   end
 
   defp tip_trimmer(dimensions, side) do

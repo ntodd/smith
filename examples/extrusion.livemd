@@ -1,0 +1,112 @@
+# Smith — Extrusion extent and tapered walls
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install the pinned toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
+Restart the Livebook runtime after updating native code.
+All dimensions below are millimeters; taper angles are degrees.
+
+This notebook builds a symmetric tapered block, a tapered ring, and a block with
+a tilted end cap. Each stage has its own preview. Rotate, zoom, use fullscreen,
+or download a PNG from the preview toolbar. The final cell exports separate parts.
+
+## A profile on the center plane
+
+```elixir
+alias Smith.{Assembly, Plane, Sketch}
+profile = Sketch.rectangle(20, 16)
+Smith.Kino.render(profile, label: "1 · Neutral profile")
+```
+
+## Symmetric extent
+
+`both: true` uses the distance on each side of the sketch. Five millimeters makes
+10 mm total depth, centered on Z=0. The starting profile remains reusable.
+
+```elixir
+straight = Smith.extrude(profile, 5, both: true)
+{:ok, straight_result} = Smith.evaluate(straight)
+{:ok, {{-10.0, -8.0, -5.0}, {10.0, 8.0, 5.0}}} = OCEx.bounds(straight_result.shape)
+Smith.Kino.render(straight_result, label: "2 · Five millimeters on each side")
+```
+
+## Taper away from the neutral section
+
+Positive taper narrows the outside away from the sketch plane on both sides.
+Each half has section area `(20 - 2*z*tan(angle)) * (16 - 2*z*tan(angle))`.
+Integrating that area checks the actual solid volume below.
+
+```elixir
+tapered = Smith.extrude(profile, 5, both: true, taper: 5)
+{:ok, tapered_result} = Smith.evaluate(tapered)
+slope = :math.tan(5 * :math.pi() / 180)
+expected = 2 * (320 * 5 - 36 * slope * 25 + 4 * slope * slope * 125 / 3)
+{:ok, volume} = OCEx.volume(tapered_result.shape)
+true = abs(volume - expected) < 1.0e-5
+Smith.Kino.render(tapered_result, label: "3 · Five-degree tapered walls")
+```
+
+Negative taper adds material away from the profile. Angles must lie strictly
+between −90 and 90 degrees. Nonzero taper needs travel normal to the sketch and
+straight or circular boundary edges. Collapsing walls and topology changes can fail.
+
+## Taper a profile with a hole
+
+Positive taper makes the inner hole wider while making the outer radius smaller.
+This is a wall angle, not proportional scaling of the whole outline.
+
+```elixir
+ring = Sketch.circle(10)
+  |> Sketch.cut(Sketch.circle(4))
+  |> Smith.extrude(5, taper: 4)
+{:ok, ring_result} = Smith.evaluate(ring)
+slope = :math.tan(4 * :math.pi() / 180)
+{:ok, volume} = OCEx.volume(ring_result.shape)
+true = abs(volume - :math.pi() * (84 * 5 - 14 * slope * 25)) < 1.0e-5
+Smith.Kino.render(ring_result, label: "4 · Tapered ring")
+```
+
+## Stop at a tilted plane
+
+This plane is `z = 4 + x/2`. The block height varies from 4 to 9 mm, with a 6.5 mm
+average over its 10 × 6 footprint. The target must be ahead of the entire profile;
+crossing or touching targets fail. `extrude_until` makes straight, untapered walls.
+Use `direction:` to override a sketch's normal; face recipes require that option.
+
+```elixir
+target = Plane.new(origin: {0, 0, 4}, normal: {-0.5, 0, 1}, x_direction: {1, 0, 0.5})
+sloped = Sketch.rectangle(10, 6, align: {:min, :min}) |> Smith.extrude_until(target)
+{:ok, sloped_result} = Smith.evaluate(sloped)
+{:ok, volume} = OCEx.volume(sloped_result.shape)
+true = abs(volume - 390) < 1.0e-6
+Smith.Kino.render(sloped_result, label: "5 · Tilted end cap")
+```
+
+## Export a three-part print pack
+
+Assembly placement keeps the parts apart for inspection. Print placement centers
+each part on the bed. Export runs the mesh and STEP checks before publishing the
+current manifest. Use the paths from this run; earlier exports remain on disk.
+
+```elixir
+sample = Assembly.new(:extrusion_samples)
+  |> Assembly.part(:tapered, tapered, position: {-30, 0, 5}, print: [on_bed: true])
+  |> Assembly.part(:ring, ring, print: [on_bed: true])
+  |> Assembly.part(:sloped, sloped, position: {25, 0, 0}, print: [on_bed: true])
+{:ok, assembly} = Smith.evaluate(sample)
+Smith.Kino.render(assembly, label: "6 · Extrusion samples")
+```
+
+```elixir
+{:ok, files} = Smith.export(assembly, "output/models", name: "extrusion-samples",
+  angular_tolerance: 0.1)
+3 = length(files.parts)
+true = Enum.all?(files.parts, & &1.verification.mesh.watertight)
+{:ok, printable_files} = :zip.extract(File.read!(files.print_pack), [:memory])
+6 = length(printable_files)
+Kino.Text.new(files.print_pack)
+```

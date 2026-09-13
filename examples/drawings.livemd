@@ -1,0 +1,115 @@
+# Smith — Draw and export a mechanical part
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install the pinned native toolkit from the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
+Restart the Livebook runtime after updating native
+code. Dimensions are millimeters; modeling angles are degrees.
+
+This notebook builds a plate, checks its volume, and renders three orthographic
+views. Drawing visibility comes from the BREP; SVG/DXF curves are sampled only
+when exported. The final files are written on the Livebook runtime's machine.
+
+## Build a counterbored plate
+
+The outline has 3 mm corners. Two through holes have 8 mm head recesses, 3 mm
+deep. A third, smaller hole stops 4 mm below the top. An explicit entry plane
+keeps the hole coordinates fixed as cuts change the top face.
+
+```elixir
+alias Smith.{Drawing, Plane, Sketch}
+blank = Sketch.rounded_rectangle(50, 30, 3) |> Smith.extrude(8)
+entry = Plane.xy(z: 8)
+plate = for x <- [-15, 15], reduce: blank do
+  body -> Smith.counterbore(body, on: entry, at: {x, 0},
+    diameter: 4, bore_diameter: 8, bore_depth: 3, through: :all)
+end
+plate = Smith.hole(plate, on: entry, at: {0, 8}, diameter: 3, depth: 4)
+{:ok, part} = Smith.evaluate(plate)
+{:ok, volume} = OCEx.volume(part.shape)
+expected = (50 * 30 - (4 - :math.pi()) * 9) * 8 -
+  2 * :math.pi() * (4 * 8 + (16 - 4) * 3) - :math.pi() * 2.25 * 4
+true = abs(volume - expected) < 1.0e-5
+Smith.Kino.render(part, label: "Counterbores and blind locating hole")
+```
+
+## Compare three views
+
+The normal points toward the viewer. XY looks along −Z; XZ looks along +Y with
+world Z pointing up on the page. The custom plane is oblique but still
+orthographic: distant edges do not get smaller.
+
+```elixir
+planes = [{"Top", :xy}, {"Front", :xz},
+  {"Oblique", Plane.new(normal: {1, -1, 1}, x_direction: {1, 1, 0})}]
+drawings = for {name, plane} <- planes do
+  {:ok, drawing} = Drawing.new(part, on: plane)
+  {name, drawing}
+end
+drawings |> Enum.map(fn {name, drawing} ->
+  {:ok, svg} = Drawing.svg(drawing, title: name, tolerance: 0.01)
+  Kino.Layout.grid([Kino.Markdown.new("**#{name}**"), Kino.Image.new(svg, :svg)])
+end) |> Kino.Layout.grid(columns: 3)
+```
+
+Gray dashed lines are hidden features. Visible lines are painted above them.
+These static images complement the rotatable 3D preview. SVG dimensions are in
+millimeters; Livebook may scale the image to fit its output area.
+
+## Inspect the hidden features
+
+The front view reveals the bores inside the plate. Native curves remain available
+for queries; sampled polylines are ordinary lists of local XY points. Lowering
+the sampling tolerance changes those lists, not the original geometry.
+
+```elixir
+{"Front", front} = List.keyfind(drawings, "Front", 0)
+{:ok, lines} = Drawing.polylines(front, tolerance: 0.01)
+true = lines.hidden != []
+Kino.DataTable.new([
+  %{layer: "visible", edges: length(lines.visible)},
+  %{layer: "hidden", edges: length(lines.hidden)}
+])
+```
+
+## Hide dashed lines and show tangent boundaries
+
+`hidden: false` omits hidden geometry at export. `tangents: true` affects native
+drawing construction: it includes smooth G1 boundaries between faces. Seams
+within a periodic surface are omitted in both cases.
+
+```elixir
+{:ok, tangent_view} = Drawing.new(part, on: :xz, tangents: true)
+{:ok, clean_svg} = Drawing.svg(tangent_view, hidden: false, title: "Visible boundaries")
+Kino.Image.new(clean_svg, :svg)
+```
+
+## Export views and printable geometry
+
+The drawing directory includes the source geometry revision. SVG uses polylines
+with physical mm dimensions and a margin; DXF uses LWPOLYLINE entities in mm on
+VISIBLE/HIDDEN layers. DXF keeps upward Y and has no SVG margin. Neither format
+creates dimensions, joined cutting contours, or toolpaths. Check scale in the
+receiving application.
+
+```elixir
+directory = Path.join("output/drawings", part.revision)
+File.mkdir_p!(directory)
+paths = for {name, drawing} <- drawings, extension <- ["svg", "dxf"] do
+  path = Path.join(directory, String.downcase(name) <> "." <> extension)
+  {:ok, ^path} = Drawing.write(drawing, path, tolerance: 0.01)
+  %{view: name, format: extension, path: path}
+end
+{:ok, printable} = Smith.export(part, "output/models", name: "drawing-plate",
+  on_bed: true, angular_tolerance: 0.1)
+true = printable.verification.mesh.watertight
+Kino.DataTable.new(paths)
+```
+
+STL and 3MF are separate checked exports of the solid. For an assembly drawing,
+pass an assembly result to `Drawing.new/2`; installed parts occlude one another.
+Use `Assembly.view(result, :exploded)` for a drawing of that explicit pose.

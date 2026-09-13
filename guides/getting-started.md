@@ -56,7 +56,7 @@ Use a struct for parameters when a design has many dimensions; pass it to featur
 | `Smith.Assembly`        | A recipe with named manufactured parts and references |
 | `Smith.Assembly.Result` | Evaluated members and their installed compound        |
 
-Bare sketches evaluate to faces, which can be inspected with `OCEx.area/1`. Extrude, revolve, or loft before printable export. A model recipe may also describe an edge or an empty compound; successful evaluation does not necessarily mean a printable solid.
+Bare sketches evaluate to faces, which can be inspected with `OCEx.area/1`. Extrude, revolve, loft, or sweep before printable export. A model recipe may also describe an edge or an empty compound; successful evaluation does not necessarily mean a printable solid.
 
 ## Inspect and export
 

@@ -19,7 +19,7 @@ defmodule Smith.MixProject do
       ],
       docs: [
         main: "readme",
-        assets: %{"guides/images" => "guides/images"},
+        assets: %{"guides/images" => "guides/images", "guides/figures" => "figures"},
         source_ref: "v0.1.0",
         source_url_pattern: "https://github.com/ntodd/smith/blob/v0.1.0/%{path}#L%{line}",
         extras: [
@@ -27,7 +27,14 @@ defmodule Smith.MixProject do
           "guides/getting-started.md",
           "guides/modeling.md",
           "guides/sketches.md",
+          "guides/paths-and-shells.md",
+          "guides/mechanical-parts.md",
+          "guides/forming.md",
+          "guides/extrusion.md",
+          "guides/projection.md",
+          "guides/drawings.md",
           "guides/assemblies.md",
+          "guides/joints.md",
           "guides/exporting.md",
           "guides/livebook.md",
           "guides/errors-and-limits.md",
@@ -36,9 +43,16 @@ defmodule Smith.MixProject do
         ],
         groups_for_modules: [
           Modeling: [Smith, Smith.Model, Smith.Result, Smith.Error],
-          Sketches: [Smith.Plane, Smith.Sketch],
-          Assemblies: [Smith.Assembly, Smith.Assembly.Result],
-          Export: [Smith.Export, Smith.Mesh],
+          Sketches: [Smith.Plane, Smith.Sketch, Smith.Path],
+          Selection: [Smith.Selector],
+          Internals: [Smith.Features.Hole, Smith.Assembly.Frame],
+          Assemblies: [
+            Smith.Assembly,
+            Smith.Assembly.Result,
+            Smith.Assembly.Joint,
+            Smith.Assembly.Export
+          ],
+          Export: [Smith.Export, Smith.Mesh, Smith.Drawing],
           Livebook: [Smith.Kino]
         ]
       ]

@@ -27,9 +27,9 @@ The standalone model scripts honor it too. Unset it before public dependency or
 publication checks. Smith's hosted CI deliberately resolves OCEx from Hex and
 therefore requires the first OCEx publication before it can pass.
 
-`make check` runs 91 behavioral tests, 26 doctests, and four public model acceptance
-tests. `make docs` executes README/guide code and generates ExDoc with warnings
-treated as errors. `make notebooks` evaluates model cells using local dependencies;
+`make check` runs formatting, warnings-as-errors compilation, behavioral tests,
+doctests, and public model acceptance tests. `make docs` executes README/guide code
+and generates ExDoc with warnings treated as errors. `make notebooks` evaluates model cells using local dependencies;
 notebook setup is exercised separately when checking installation.
 
 Public clip and plant stand sources and frozen-reference tests live in [models](../models/README.md).

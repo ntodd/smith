@@ -20,7 +20,7 @@ defmodule Smith.Result do
 
   `:shape` is an `OCEx.Shape` for native queries, and `:revision` is the
   lowercase SHA-256 hash of its serialized BREP. A result may hold an edge,
-  face, solid, or compound; it does not necessarily describe a printable part.
+  wire, face, solid, or compound; it does not necessarily describe a printable part.
 
   Pass the result to `Smith.export/3` or `Smith.Kino.render/2`. Treat the
   fields as read-only. Export checks the shape against its revision.
@@ -39,9 +39,11 @@ defmodule Smith.Error do
 
     * `:step` — one-based operation index in construction order, or `nil`
       for an assembly member validation failure.
-    * `:operation` — the failed recipe operation, or `:assembly`.
+    * `:operation` — the failed recipe operation, `:assembly`, `:joint`, or `:connect`.
     * `:reason` — an error atom or a nested `Smith.Error` from a tool recipe.
-    * `:part` — the original assembly member name, or `nil` outside an assembly.
+    * `:part` — the original top-level member name, a normalized slash path
+      for a nested failure, the joint/connection endpoint for joint errors, or
+      `nil` outside an assembly.
 
   This is a result value, not an exception. Match on it in
   `{:error, %Smith.Error{}}`. Some top-level failures return bare atoms;
@@ -82,13 +84,16 @@ defmodule Smith do
   coordinates. Mesh angular tolerance is in radians.
 
   Boxes begin at the origin by default. Cylinders and cones are centered
-  on world Z with their bottoms at Z=0. All three support explicit placement
+  on world Z with their bottoms at Z=0. Spheres and tori are centered at
+  the origin. All solid primitives support explicit placement
   with `:at` and per-axis `:align`.
 
   ## Where to start
 
     * [Getting started](getting-started.html) — a complete script and first export.
     * `Smith.Sketch` — 2D outlines, cutouts, and planes.
+    * `Smith.Path` — open paths for placed sweep profiles.
+    * `Smith.Selector` — composable edge and face queries.
     * `Smith.Assembly` — named parts, references, and print placement.
     * `Smith.Export` — files, mesh checks, and export records.
     * `Smith.Kino` — interactive Livebook previews.
@@ -97,7 +102,7 @@ defmodule Smith do
   argument types; arbitrary malformed Elixir terms and callback exceptions
   are not converted into modeling errors. See [errors and limits](errors-and-limits.html).
   """
-  @moduledoc groups: ["Primitives", "Profiles", "Modeling", "Evaluation and export"]
+  @moduledoc groups: ["Primitives", "Profiles", "Modeling", "Topology", "Evaluation and export"]
   alias Smith.{Model, Result, Error}
 
   @type alignment :: {:min | :center | :max, :min | :center | :max, :min | :center | :max}
@@ -167,6 +172,240 @@ defmodule Smith do
   @spec cone(number(), number(), number(), [primitive_option()]) :: Model.t()
   def cone(bottom_radius, top_radius, height, opts \\ []),
     do: primitive(:cone, [bottom_radius, top_radius, height], opts)
+
+  @doc """
+  Describes a sphere by radius in mm, centered at the origin by default.
+
+  Radius must exceed 1.0e-7 mm. Supports the `:at` and `:align` options
+  of `box/4`, defaulting to `{:center, :center, :center}`.
+  """
+  @doc group: "Primitives"
+  @spec sphere(number(), [primitive_option()]) :: Model.t()
+  def sphere(radius, opts \\ []), do: primitive(:sphere, [radius], opts)
+
+  @doc """
+  Describes a complete ring torus around world Z, centered at the origin.
+
+  `major_radius` measures from the axis to the tube center; `minor_radius`
+  is the tube radius, both in mm. Both radii and their difference must exceed
+  1.0e-7 mm. Supports `:at` and `:align` as in `box/4`, defaulting to
+  `{:center, :center, :center}`. Rotate the recipe for another axis.
+  Horn and spindle tori fail with `:invalid_argument` at evaluation.
+  """
+  @doc group: "Primitives"
+  @spec torus(number(), number(), [primitive_option()]) :: Model.t()
+  def torus(major_radius, minor_radius, opts \\ []),
+    do: primitive(:torus, [major_radius, minor_radius], opts)
+
+  @doc """
+  Reflects a recipe across a world plane.
+
+  Accepts `:xy`, `:xz`, `:yz` through the origin, or a `Smith.Plane`
+  for a positioned or oblique mirror. Returns only the reflected geometry;
+  use `compound/1` or `fuse/2` to retain both copies. Supports face and
+  edge recipes as well as solids. Invalid planes produce `:invalid_plane`
+  at this recipe step. The source recipe remains reusable.
+
+      iex> {:ok, part} = Smith.box(2, 3, 4) |> Smith.mirror(Smith.Plane.yz(x: 5)) |> Smith.evaluate()
+      iex> {:ok, bounds} = OCEx.bounds(part.shape)
+      iex> bounds == {{8.0, 0.0, 0.0}, {10.0, 3.0, 4.0}}
+      true
+  """
+  @doc group: "Modeling"
+  @spec mirror(Model.t(), :xy | :xz | :yz | Smith.Plane.t()) :: Model.t()
+  def mirror(model, plane), do: append(model, :mirror, [plane])
+
+  @doc """
+  Divides solid geometry with an infinite world plane.
+
+  Accepts `:xy`, `:xz`, `:yz`, or a positioned `Smith.Plane`.
+  The only option is `keep:`: `:both` (default), `:positive`, or
+  `:negative`. Positive follows the plane normal, so the positive side
+  of an XZ plane is world -Y. Both retains separate solids at the cut.
+
+  Accepts a solid or a collection containing only solids. A plane outside
+  the body retains the material on its side; the opposite side evaluates
+  to an empty compound. One remaining piece is a solid, multiple pieces
+  form a compound. Query `OCEx.solids/1` on the result to inspect pieces,
+  or use separate recipes with `keep:` to name and export each side.
+
+  Invalid planes fail with `:invalid_plane`; invalid options with
+  `:invalid_options`; unsupported topology with `:wrong_shape_type`.
+  Errors identify this recipe step. The source recipe remains reusable.
+  """
+  @doc group: "Modeling"
+  @spec split(Model.t(), :xy | :xz | :yz | Smith.Plane.t(), keyword()) :: Model.t()
+  def split(model, plane, opts \\ []), do: append(model, :split, [plane, opts])
+
+  @doc """
+  Takes a filled cross section of solid material on a world plane.
+
+  Accepts `:xy`, `:xz`, `:yz`, or a positioned `Smith.Plane`.
+  Returns a deferred model whose result contains planar faces, retaining
+  inner holes and disconnected regions. One region is a face; zero or
+  several regions form a compound. An outside or point/edge-tangent plane
+  gives no faces. A coincident boundary face remains in the section.
+
+  Coordinates stay in world space and face normals follow the plane's
+  normal. Inspect with `faces/2`, `inspect_faces/2`, or `OCEx.area/1`.
+  Extrude with a world vector to turn the section into solids. Bare section
+  faces cannot be exported as printable bundles. This is an intersection,
+  not a projection, and its input must contain only solid geometry.
+
+      iex> section = Smith.box(4, 6, 8) |> Smith.section(Smith.Plane.xy(z: 3))
+      iex> {:ok, part} = section |> Smith.extrude({0, 0, 2}) |> Smith.evaluate()
+      iex> {:ok, volume} = OCEx.volume(part.shape)
+      iex> abs(volume - 48) < 1.0e-6
+      true
+  """
+  @doc group: "Profiles"
+  @spec section(Model.t(), :xy | :xz | :yz | Smith.Plane.t()) :: Model.t()
+  def section(model, plane), do: append(model, :section, [plane])
+
+  @doc """
+  Projects a sketch, path, or edge/face recipe onto target surfaces.
+
+  The target is a model or sketch recipe. Supply exactly one option:
+  `direction: {x, y, z}` for parallel projection or
+  `from: {x, y, z}` for projection through a world point. Parallel
+  directions are normalized. Coordinates remain in world space.
+
+  Sketches contribute their boundary wires, including holes. Results are
+  wires, which may be open when clipped by the target. They are not filled
+  faces or printable solids. Multiple target hits are retained, and
+  parallel projection is bidirectional. Use `surface/2` to select target
+  faces before projecting when only one side of a body is wanted. Conical
+  projection follows half-rays from the point through the source, excluding
+  the opposite side of that point.
+
+  Source collections fail if a boundary misses or projection fails. The
+  result can be inspected with `edges/2` or native wire/curve queries.
+  Use `face/1` to fill a single closed planar outline before extrusion.
+  Solid source recipes are not accepted: explicitly select their surfaces
+  first. See `OCEx.project/3` for topology and failure details.
+  Inputs stay reusable; target failures retain their nested recipe context.
+  """
+  @doc group: "Profiles"
+  @spec project(
+          Model.t() | Smith.Sketch.t() | Smith.Path.t(),
+          Model.t() | Smith.Sketch.t(),
+          keyword()
+        ) :: Model.t()
+  def project(%{__struct__: Smith.Sketch} = sketch, target, opts),
+    do: new(:sketch, [sketch]) |> project(target, opts)
+
+  def project(%{__struct__: Smith.Path} = path, target, opts),
+    do: new(:path, [path]) |> project(target, opts)
+
+  def project(model, target, opts), do: append(model, :project, [target, opts])
+
+  @doc """
+  Tapers selected faces around a neutral plane.
+
+  Requires `faces:`, `neutral:`, and `angle:`. Faces use the usual
+  `Smith.Selector` inputs. The neutral plane accepts `:xy`, `:xz`,
+  `:yz`, or a positioned `Smith.Plane`; the surface intersections with
+  that plane stay fixed. Angles are degrees, strictly between -90 and 90.
+
+  Optional `direction:` is the pull vector and defaults to the neutral
+  plane normal. It must be nonzero and not lie in that plane. Positive
+  angles remove material on the pull side; negative angles add material.
+  Zero retains the geometry. Optional positive `count:` guards the
+  number of explicitly selected faces, before tangent propagation.
+
+  Requires one solid, including a solid wrapped by an earlier Boolean
+  operation. Selected faces must be planar, cylindrical, or conical.
+  OCCT also tapers tangent-connected faces. The requested taper must not
+  collapse edges or otherwise require a topology change. Those cases may
+  return `:draft_failed` or a native geometry error. Empty selections,
+  incorrect counts, invalid planes and options retain their usual tagged
+  errors at this step. The source recipe remains reusable.
+  """
+  @doc group: "Modeling"
+  @spec draft(Model.t(), keyword()) :: Model.t()
+  def draft(model, opts), do: append(model, :draft, opts)
+
+  @doc """
+  Extracts selected faces and sews their shared edges into a surface recipe.
+
+  The selector defaults to `:all` and resolves against the geometry at
+  this step. Connected faces form shells; a single face remains a face;
+  disconnected surfaces form a compound. A closed shell remains a surface,
+  not a filled solid. Coordinates and source face orientations are retained.
+
+  Use this to extract a curved wall for `offset/3` or `thicken/3`.
+  Empty selections return `:empty_selection`. Sewing uses 1.0e-7 mm
+  tolerance and rejects non-manifold joins. The original model is unchanged.
+  Bare surfaces are not printable bundles; thicken them first.
+  """
+  @doc group: "Profiles"
+  @spec surface(Model.t(), Smith.Selector.input()) :: Model.t()
+  def surface(model, selector \\ :all), do: append(model, :surface, [selector])
+
+  @doc """
+  Offsets a solid or surface by a signed normal distance in mm.
+
+  Positive distances expand oriented solids or follow surface normals;
+  negative distances contract solids or oppose the normals. Magnitude must
+  exceed 1.0e-7 mm. Faces, shells, solids, and their compounds are supported.
+  Sketch inputs become face recipes before offsetting.
+
+  This is a **3D surface offset**: offsetting a planar sketch moves its
+  plane and does not grow its outline. `join: :arc` (default) rounds
+  convex gaps; `:intersection` extends adjacent surfaces until they meet.
+  Compound members are offset independently. Use `surface/2` to sew
+  selected connected faces before offsetting them as a shell.
+
+  Solid results must expand/contract with directional containment, checked
+  at the volume tolerance documented in `OCEx.offset/3`. Complete collapse
+  or inversion is an error. Curved surfaces require sufficiently smooth
+  geometry and a small enough offset to avoid self-intersection. Global
+  self-intersection repair is not provided. Native and option failures
+  retain this recipe step's context.
+  """
+  @doc group: "Modeling"
+  @spec offset(Model.t() | Smith.Sketch.t(), number(), keyword()) :: Model.t()
+  def offset(model, distance, opts \\ [])
+
+  def offset(%{__struct__: Smith.Sketch} = sketch, distance, opts),
+    do: new(:sketch, [sketch]) |> offset(distance, opts)
+
+  def offset(model, distance, opts), do: append(model, :offset, [distance, opts])
+
+  @doc """
+  Builds solid material between an open surface and its signed offset.
+
+  Accepts a sketch or a model containing faces/open shells. Magnitude must
+  exceed 1.0e-7 mm. Positive thickness follows oriented normals; negative
+  thickness goes against them. The original surface forms one boundary,
+  free edges receive connecting walls, and holes remain open.
+
+  `join: :intersection` (default) extends adjacent surfaces; `:arc`
+  uses rounded transitions where applicable. Use `surface/2` to extract
+  and sew faces from a solid. Disconnected surfaces produce separate
+  solids without fusing. A solid input fails with `:wrong_shape_type`;
+  a closed shell fails with `:closed_shell`. Use `shell/2` to hollow
+  an existing solid instead.
+
+  Results pass native shape and positive-volume checks. Smoothness,
+  inversion, and self-intersection limits follow `OCEx.thicken/3`.
+  Excessive thickness is a modeling failure, not an instruction to repair
+  or delete intersecting features. Thickness is uniform along the normals.
+
+      iex> wall = Smith.cylinder(10, 12) |> Smith.surface(Smith.Selector.type(:cylinder))
+      iex> {:ok, tube} = wall |> Smith.thicken(-2) |> Smith.evaluate()
+      iex> {:ok, volume} = OCEx.volume(tube.shape)
+      iex> abs(volume - 432 * :math.pi()) < 1.0e-5
+      true
+  """
+  @doc group: "Modeling"
+  @spec thicken(Model.t() | Smith.Sketch.t(), number(), keyword()) :: Model.t()
+  def thicken(model, thickness, opts \\ [])
+
+  def thicken(%{__struct__: Smith.Sketch} = sketch, thickness, opts),
+    do: new(:sketch, [sketch]) |> thicken(thickness, opts)
+
+  def thicken(model, thickness, opts), do: append(model, :thicken, [thickness, opts])
 
   defp primitive(op, args, []), do: new(op, args)
   defp primitive(op, args, opts), do: new(op, args ++ [opts])
@@ -247,6 +486,23 @@ defmodule Smith do
   def profile(edges), do: new(:profile, [edges])
 
   @doc """
+  Fills one closed planar wire as a face recipe.
+
+  Use after `project/3` when its result is a single closed outline.
+  The face retains the wire's world placement. It can then be extruded,
+  revolved, or used in face Boolean operations. Input recipes remain reusable.
+
+  This does not infer holes or choose a wire from multiple projection hits.
+  A compound of wires returns `:wrong_shape_type`, an open wire returns
+  `:open_wire`, and nonplanar or invalid boundaries fail in OCEx. Select
+  a single target surface before projection when only one outline is wanted.
+  To construct a face from edge recipes directly, use `profile/1`.
+  """
+  @doc group: "Profiles"
+  @spec face(Model.t()) :: Model.t()
+  def face(model), do: append(model, :face, [])
+
+  @doc """
   Describes a planar polygon face from world-coordinate points.
 
   Supply at least three points in boundary order. Closure is implicit;
@@ -259,17 +515,19 @@ defmodule Smith do
   def polygon(points), do: new(:polygon, [points])
 
   @doc """
-  Describes an extrusion of a sketch or a face recipe.
+  Describes an extrusion of a sketch, face recipe, or compound of planar faces.
 
   With a `Smith.Sketch`, supply a signed distance in millimeters. Positive
   distance follows its plane normal; negative distance extends behind the
   plane. Zero fails with `:invalid_extrusion`. Sketch holes pass through
   the solid.
 
-  With a `Smith.Model` that evaluates to a planar face, supply a world
+  With a `Smith.Model` that evaluates to planar faces, supply a world
   vector `{x, y, z}`. It must have a nonzero normal component; extrusion
   within the face plane fails with `:degenerate_extrusion`. Native length
-  tolerances also apply. A scalar distance is only supported for sketches.
+  tolerances also apply. Each face produces its own solid; results are not
+  fused. This supports disconnected regions from `section/2`. A scalar
+  distance is only supported for sketches.
 
       iex> model = Smith.Sketch.rectangle(4, 6) |> Smith.extrude(-2)
       iex> {:ok, part} = Smith.evaluate(model)
@@ -283,6 +541,65 @@ defmodule Smith do
     do: new(:sketch_extrude, [sketch, distance])
 
   def extrude(model, vector), do: append(model, :extrude, [vector])
+
+  @doc """
+  Extrudes with symmetric extent or tapered walls.
+
+  Accepts the same profile and distance/vector forms as `extrude/2`.
+  Options default to `both: false` and `taper: 0`. With `both: true`,
+  the supplied distance applies on each side of the profile, so a distance
+  of 5 makes a total depth of 10. The sign selects the first direction;
+  both halves have equal extent.
+
+  `taper:` is in degrees, strictly between −90 and 90. Positive values
+  narrow outer walls and widen holes away from the starting profile;
+  negative values widen outer walls and narrow holes. Each symmetric half
+  tapers away from the shared starting plane. The profile is the neutral
+  section, not a scaled copy of the end section.
+
+  Nonzero taper requires travel normal to the profile and straight or
+  circular boundary edges. Collapsing walls, unsupported side surfaces,
+  and topology changes fail through OCEx with this recipe step's context.
+  See `OCEx.extrude/3` for native limits and error reasons. Options are
+  validated at evaluation. Earlier recipes remain reusable.
+  """
+  @doc group: "Profiles"
+  @spec extrude(Smith.Sketch.t(), number(), keyword()) :: Model.t()
+  @spec extrude(Model.t(), {number(), number(), number()}, keyword()) :: Model.t()
+  def extrude(%{__struct__: Smith.Sketch} = sketch, distance, opts),
+    do: new(:sketch_extrude, [sketch, distance, opts])
+
+  def extrude(model, vector, opts), do: append(model, :extrude, [vector, opts])
+
+  @doc """
+  Extrudes a profile until it meets an infinite target plane.
+
+  The target is a `Smith.Plane` or `:xy`, `:xz`, or `:yz`.
+  Sketches travel along their plane normal by default. Supply
+  `direction: {x, y, z}` for an oblique or reversed world direction;
+  the vector is normalized. Face recipes require this option explicitly.
+
+  The entire profile must lie behind the target in the travel direction.
+  A target crossing or touching the starting profile returns
+  `:target_not_ahead`. The target may be tilted relative to the profile;
+  its normal's sign does not affect the result. Holes and disconnected
+  face regions remain intact, with a separate solid for each face.
+
+  Walls are straight and untapered. `:direction` is the only option;
+  `:both` and `:taper` are not accepted here. This stops at a plane,
+  not the nearest face of another body. See `OCEx.extrude_until/4` for
+  native tolerances and failure reasons. Geometry errors retain recipe
+  step context, and input recipes remain unchanged.
+  """
+  @doc group: "Profiles"
+  @spec extrude_until(Model.t() | Smith.Sketch.t(), Smith.Plane.t() | :xy | :xz | :yz, keyword()) ::
+          Model.t()
+  def extrude_until(profile, plane, opts \\ [])
+
+  def extrude_until(%{__struct__: Smith.Sketch} = sketch, plane, opts),
+    do: new(:sketch_extrude_until, [sketch, plane, opts])
+
+  def extrude_until(model, plane, opts), do: append(model, :extrude_until, [plane, opts])
 
   @doc """
   Describes a solid formed by revolving a sketch or face about a world axis.
@@ -317,13 +634,17 @@ defmodule Smith do
   def revolve(model, axis, degrees, origin), do: append(model, :revolve, [origin, axis, degrees])
 
   @doc """
-  Describes a capped, ruled solid through two or more ordered sketches.
+  Describes a capped solid through two or more ordered sketches.
 
   Each sketch uses its own plane and must have exactly one boundary wire.
   Sections with holes fail with `:loft_profile_has_holes`. A cut touching
   the outer edge is allowed if it leaves one boundary. OCCT chooses edge
-  correspondence; there are no guide rails, seam controls, or smooth-loft
-  options. Smith requires one solid with volume greater than 1.0e-9 mm³.
+  correspondence; there are no guide rails or seam controls.
+
+  `ruled: true` (default) joins adjacent sections with straight generators.
+  Use `ruled: false` for a smooth interpolating loft. Smooth interpolation
+  can overshoot between sections; inspect the result for your dimensions.
+  Smith requires one solid with volume greater than 1.0e-9 mm³.
 
       iex> sections = [
       ...>   Smith.Sketch.rectangle(20, 10),
@@ -335,8 +656,108 @@ defmodule Smith do
       1
   """
   @doc group: "Profiles"
-  @spec loft([Smith.Sketch.t()]) :: Model.t()
-  def loft(sketches), do: new(:loft, [sketches])
+  @spec loft([Smith.Sketch.t()], keyword()) :: Model.t()
+  def loft(sketches, opts \\ []), do: new(:loft, [sketches, opts])
+
+  @doc """
+  Sweeps a placed sketch along an open `Smith.Path`.
+
+  The sketch must have one closed boundary and lie in the plane through
+  the start of the path, perpendicular to its starting tangent. Its local
+  offset is retained. Smith does not move or rotate it onto the path.
+  Profiles with holes return `:sweep_profile_has_holes`.
+
+  Options match `OCEx.sweep/3`: `frame: :corrected` (default) or
+  `:frenet`, and `transition: :transformed` (default), `:right`, or
+  `:round`. Tangent-continuous paths avoid sharp-corner transition ambiguity.
+  Construction and validation are deferred until `evaluate/1`.
+
+      iex> path = Smith.Path.new([Smith.line({0, 0, 0}, {0, 0, 10})])
+      iex> {:ok, rod} = Smith.Sketch.circle(2) |> Smith.sweep(path) |> Smith.evaluate()
+      iex> {:ok, volume} = OCEx.volume(rod.shape)
+      iex> abs(volume - 40 * :math.pi()) < 1.0e-6
+      true
+  """
+  @doc group: "Modeling"
+  @spec sweep(Smith.Sketch.t(), Smith.Path.t(), keyword()) :: Model.t()
+  def sweep(sketch, path, opts \\ []), do: new(:sweep, [sketch, path, opts])
+
+  @doc """
+  Hollows the current solid by removing selected faces and offsetting its walls.
+
+  Required options are `:openings` (a `Smith.Selector` or face predicate)
+  and signed `:thickness` in millimeters. Negative thickness builds inward;
+  positive builds outward. `:join` is `:arc` (default) or `:intersection`.
+  Optional `:count` requires exactly that many opening faces.
+
+  Selectors run against the body at this recipe step. An empty selection
+  returns `:empty_selection`; an unexpected count returns
+  `:selection_count_mismatch`. Thickness must have magnitude greater than
+  1.0e-7 mm. OCCT can reject thicknesses that cannot fit the source geometry.
+  This operation requires a single solid and at least one opening; it does
+  not create a sealed cavity or thicken an open surface.
+
+      iex> {:ok, tray} = Smith.box(20, 16, 10)
+      ...>   |> Smith.shell(openings: Smith.Selector.facing(:z), thickness: -2, count: 1)
+      ...>   |> Smith.evaluate()
+      iex> {:ok, volume} = OCEx.volume(tray.shape)
+      iex> abs(volume - 1664) < 1.0e-6
+      true
+  """
+  @doc group: "Modeling"
+  @spec shell(Model.t(), keyword()) :: Model.t()
+  def shell(model, opts), do: append(model, :shell, opts)
+
+  @doc """
+  Selects edges from an evaluated result using `Smith.Selector`.
+
+  Accepts `:all` (default), `{:parallel, axis}`, a metadata predicate,
+  or a composed selector. Returns `{:ok, [OCEx.Shape.t()]}`, including an
+  empty list when nothing matches. Handles belong to this result revision.
+  Unsupported selectors return `:invalid_options`. Predicates must return
+  booleans; their exceptions propagate.
+  """
+  @doc group: "Topology"
+  @spec edges(Result.t(), Smith.Selector.input()) :: OCEx.result([OCEx.Shape.t()])
+  def edges(%Result{shape: shape}, selector \\ :all),
+    do: Smith.Selector.select(shape, :edges, selector)
+
+  @doc """
+  Selects faces from an evaluated result using `Smith.Selector`.
+
+  Returns native handles with the same result and error rules as `edges/2`.
+  Face predicates receive `OCEx.face_info/1` metadata plus world `:bounds`.
+  Empty and tied selections are retained; this query does not silently pick
+  a single face. Use a feature's `:count` option to enforce its expectation.
+  """
+  @doc group: "Topology"
+  @spec faces(Result.t(), Smith.Selector.input()) :: OCEx.result([OCEx.Shape.t()])
+  def faces(%Result{shape: shape}, selector \\ :all),
+    do: Smith.Selector.select(shape, :faces, selector)
+
+  @doc """
+  Returns selected edges with their geometry metadata and native `:shape` handles.
+
+  Each map contains `OCEx.edge_info/1` fields plus world `:bounds` and
+  `:midpoint`, using `Smith.Selector.where/2` conventions. Query order is
+  preserved. Handles belong to this result's revision. Returns a tagged list;
+  selection and native query failures propagate as tagged errors.
+  """
+  @doc group: "Topology"
+  @spec inspect_edges(Result.t(), Smith.Selector.input()) :: {:ok, [map()]} | {:error, atom()}
+  def inspect_edges(%Result{shape: shape}, selector \\ :all),
+    do: Smith.Selector.inspect(shape, :edges, selector)
+
+  @doc """
+  Returns selected faces with their geometry metadata and native `:shape` handles.
+
+  Each map contains `OCEx.face_info/1` fields plus world `:bounds`.
+  Uses the ordering, revision, and tagged-result rules of `inspect_edges/2`.
+  """
+  @doc group: "Topology"
+  @spec inspect_faces(Result.t(), Smith.Selector.input()) :: {:ok, [map()]} | {:error, atom()}
+  def inspect_faces(%Result{shape: shape}, selector \\ :all),
+    do: Smith.Selector.inspect(shape, :faces, selector)
 
   @doc """
   Appends a world-coordinate translation in millimeters.
@@ -458,6 +879,7 @@ defmodule Smith do
     * `:all` selects every edge.
     * `{:parallel, :x | :y | :z}` selects straight edges parallel to a world
       axis, in either direction. Curved edges do not match.
+    * A composed `Smith.Selector` filters by type, direction, extrema, or predicates.
     * A one-argument function receives the map from `OCEx.edge_info/1`
       plus `:bounds` and `:midpoint`. It must return `true` or `false`.
 
@@ -484,9 +906,10 @@ defmodule Smith do
     do: %{model | operations: [{:fillet, opts} | model.operations]}
 
   @doc """
-  Appends a circular through-hole along world Z or a plane normal.
+  Appends a circular through-all or flat-bottomed blind hole.
 
-  Requires `on:`, `diameter:`, and `through: :all`. Diameter is positive
+  Requires `on:`, `diameter:`, and exactly one of `through: :all` or
+  positive `depth:` in mm. Diameter is positive
   and in millimeters; its half-radius must also satisfy OCEx's native
   tolerance. Optional `at: {u, v}` defaults to `{0, 0}`.
 
@@ -496,11 +919,14 @@ defmodule Smith do
     * `on: plane` uses plane-local `:at` coordinates and drills along its
       normal. The plane is independent of the body and may lie outside it.
 
-  The cutter extends through the body's full projected bounds, including
-  disconnected solids. A cut removing no more than 1.0e-9 mm³ fails with
+  Through-all extends through the body's full projected bounds, including
+  disconnected solids. Blind depth starts at the entry plane and runs along
+  its **negative normal**, leaving a flat floor when contained in the body.
+  It is not measured from the first intersected surface; an outside plane
+  consumes part of that distance before reaching material. A cut removing no more than 1.0e-9 mm³ fails with
   `:hole_misses_body`. Top selection can fail with `:no_top_face` or
-  `:ambiguous_top_face`. Blind holes are not supported; use `cut/2`
-  with a finite cylinder for a chosen depth.
+  `:ambiguous_top_face`. Conflicting extent options fail with `:invalid_options`.
+  Use `counterbore/2` or `countersink/2` for a recessed entry.
 
       iex> model =
       ...>   Smith.box(20, 10, 4)
@@ -518,14 +944,50 @@ defmodule Smith do
   @spec hole(Model.t(), keyword()) :: Model.t()
   def hole(%Model{} = model, opts), do: %{model | operations: [{:hole, opts} | model.operations]}
 
-  @spec evaluate(Model.t() | Smith.Assembly.t() | Smith.Sketch.t()) ::
+  @doc """
+  Drills a hole with a cylindrical recess for a fastener head.
+
+  Uses `hole/2` options for `:on`, `:at`, `:diameter`, and exactly one
+  of `:depth` or `through: :all`. Also requires `:bore_diameter`, larger
+  than the hole diameter, and positive `:bore_depth`, both in mm.
+
+  The recess runs from the entry plane into its negative normal. Total
+  blind depth includes the recess and must be at least bore depth. Both
+  cutters use the original entry location even if the first cut moves the
+  face centroid. A recess removing no additional material fails with
+  `:recess_misses_body`; malformed options fail with `:invalid_options`.
+  Dimensions must also satisfy native modeling tolerance.
+  """
+  @doc group: "Modeling"
+  @spec counterbore(Model.t(), keyword()) :: Model.t()
+  def counterbore(model, opts), do: append(model, :counterbore, opts)
+
+  @doc """
+  Drills a hole with a conical recess for a countersunk fastener.
+
+  Uses `hole/2` placement and extent options. Requires `:sink_diameter`,
+  larger than `:diameter`. Optional `:angle` is the included cone angle
+  in degrees, default 90, strictly between 0 and 180.
+
+  The recess narrows from sink diameter at the entry plane to hole diameter
+  at depth `(sink_diameter - diameter) / (2 * tan(angle / 2))`.
+  It runs into the negative plane normal. Total blind depth includes this
+  recess and must reach its bottom. Uses the same entry-location and error
+  rules as `counterbore/2`. The remaining blind hole has a flat floor.
+  """
+  @doc group: "Modeling"
+  @spec countersink(Model.t(), keyword()) :: Model.t()
+  def countersink(model, opts), do: append(model, :countersink, opts)
+
+  @spec evaluate(Model.t() | Smith.Assembly.t() | Smith.Sketch.t() | Smith.Path.t()) ::
           {:ok, Result.t() | Smith.Assembly.Result.t()} | {:error, Error.t() | atom()}
   @doc """
   Builds native geometry from a model, sketch, or assembly recipe.
 
   Returns `{:ok, %Smith.Result{}}` for models and sketches, or
   `{:ok, %Smith.Assembly.Result{}}` for assemblies. A bare sketch becomes
-  a face; edge recipes and empty compounds can also evaluate successfully.
+  a face; paths evaluate to wires. Edge recipes and empty compounds can also
+  evaluate successfully.
   Successful evaluation alone does not establish printability.
 
   Model operations execute in construction order. Failures return
@@ -549,6 +1011,8 @@ defmodule Smith do
   def evaluate(%{__struct__: Smith.Assembly} = assembly), do: Smith.Assembly.evaluate(assembly)
 
   def evaluate(%{__struct__: Smith.Sketch} = sketch), do: evaluate(new(:sketch, [sketch]))
+
+  def evaluate(%{__struct__: Smith.Path} = path), do: evaluate(new(:path, [path]))
 
   def evaluate(%Model{operations: []}), do: {:error, :empty_model}
 
@@ -642,9 +1106,83 @@ defmodule Smith do
   defp apply_operation(:sketch_extrude, nil, [sketch, height]),
     do: Smith.Sketch.extrude(sketch, height)
 
-  defp apply_operation(:loft, nil, [sketches]) when is_list(sketches) and length(sketches) >= 2 do
+  defp apply_operation(:sketch_extrude, nil, [sketch, height, opts]),
+    do: Smith.Sketch.extrude(sketch, height, opts)
+
+  defp apply_operation(:sketch_extrude_until, nil, [sketch, plane, opts]) do
+    with :ok <- options(opts, [:direction], []),
+         {:ok, target} <- modeling_frame(plane),
+         do: Smith.Sketch.extrude_until(sketch, target, opts)
+  end
+
+  defp apply_operation(:extrude_until, body, [plane, opts]) do
+    with :ok <- options(opts, [:direction], [:direction]),
+         {:ok, target} <- modeling_frame(plane),
+         do: OCEx.extrude_until(body, opts[:direction], target.origin, target.n)
+  end
+
+  defp apply_operation(:loft, nil, [sketches, opts])
+       when is_list(sketches) and length(sketches) >= 2 do
     with {:ok, wires} <- loft_wires(sketches),
-         {:ok, shape} <- OCEx.loft(wires),
+         {:ok, shape} <- OCEx.loft(wires, opts),
+         do: single_solid(shape)
+  end
+
+  defp apply_operation(:path, nil, [path]), do: Smith.Path.evaluate(path)
+
+  defp apply_operation(:sweep, nil, [sketch, path, opts]) do
+    with {:ok, face} <- Smith.Sketch.evaluate(sketch),
+         {:ok, wires} <- OCEx.wires(face),
+         {:ok, wire} <- sweep_wire(wires),
+         {:ok, spine} <- Smith.Path.evaluate(path),
+         {:ok, shape} <- OCEx.sweep(wire, spine, opts),
+         do: single_solid(shape)
+  end
+
+  defp apply_operation(:face, body, []), do: OCEx.face(body)
+
+  defp apply_operation(:project, body, [target, opts]) do
+    with {:ok, result} <- Smith.evaluate(target),
+         do: OCEx.project(body, result.shape, opts)
+  end
+
+  defp apply_operation(:surface, body, [selector]) do
+    with {:ok, faces} <- Smith.Selector.select(body, :faces, selector),
+         :ok <- nonempty(faces),
+         do: OCEx.sew(faces)
+  end
+
+  defp apply_operation(op, body, [distance, opts]) when op in [:offset, :thicken],
+    do: apply(OCEx, op, [body, distance, opts])
+
+  defp apply_operation(:draft, body, opts) do
+    with :ok <-
+           options(opts, [:faces, :neutral, :angle, :direction, :count], [
+             :faces,
+             :neutral,
+             :angle
+           ]),
+         {:ok, frame} <- modeling_frame(opts[:neutral]),
+         {:ok, selected} <- Smith.Selector.select(body, :faces, opts[:faces]),
+         :ok <- nonempty(selected),
+         :ok <- selection_count(selected, opts[:count]),
+         do:
+           OCEx.draft(
+             body,
+             selected,
+             Keyword.get(opts, :direction, frame.n),
+             opts[:angle],
+             frame.origin,
+             frame.n
+           )
+  end
+
+  defp apply_operation(:shell, body, opts) do
+    with :ok <- options(opts, [:openings, :thickness, :join, :count], [:openings, :thickness]),
+         {:ok, selected} <- Smith.Selector.select(body, :faces, opts[:openings]),
+         :ok <- nonempty(selected),
+         :ok <- selection_count(selected, opts[:count]),
+         {:ok, shape} <- OCEx.shell(body, selected, opts[:thickness], Keyword.take(opts, [:join])),
          do: single_solid(shape)
   end
 
@@ -661,10 +1199,27 @@ defmodule Smith do
   defp apply_operation(:cone, nil, [bottom, top, height, opts]),
     do: placed_primitive(:cone, [bottom, top, height], opts, {:center, :center, :min})
 
+  defp apply_operation(:sphere, nil, [radius, opts]),
+    do: placed_primitive(:sphere, [radius], opts, {:center, :center, :center})
+
+  defp apply_operation(:torus, nil, [major, minor, opts]),
+    do: placed_primitive(:torus, [major, minor], opts, {:center, :center, :center})
+
+  defp apply_operation(op, body, [plane]) when op in [:mirror, :section] do
+    with {:ok, frame} <- modeling_frame(plane),
+         do: apply(OCEx, op, [body, frame.origin, frame.n])
+  end
+
+  defp apply_operation(:split, body, [plane, opts]) do
+    with {:ok, frame} <- modeling_frame(plane),
+         do: OCEx.split(body, frame.origin, frame.n, opts)
+  end
+
   defp apply_operation(:box, nil, [x, y, z]), do: OCEx.box(x, y, z)
 
-  defp apply_operation(op, nil, args) when op in [:cylinder, :cone, :edge, :arc, :spline],
-    do: apply(OCEx, op, args)
+  defp apply_operation(op, nil, args)
+       when op in [:cylinder, :cone, :sphere, :torus, :edge, :arc, :spline],
+       do: apply(OCEx, op, args)
 
   defp apply_operation(:polygon, nil, [points]) when is_list(points) and length(points) >= 3 do
     edges =
@@ -704,20 +1259,22 @@ defmodule Smith do
          do: OCEx.clean(shape)
   end
 
-  defp apply_operation(:hole, body, opts) do
-    with :ok <- options(opts, [:on, :diameter, :through, :at], [:on, :diameter, :through]),
-         :ok <- hole_options(opts),
-         {:ok, placed} <- hole_tool(body, opts),
-         {:ok, result} <- OCEx.cut(body, placed),
-         {:ok, before_volume} <- OCEx.volume(body),
-         {:ok, after_volume} <- OCEx.volume(result) do
-      if before_volume - after_volume > 1.0e-9,
-        do: {:ok, result},
-        else: {:error, :hole_misses_body}
-    end
-  end
+  defp apply_operation(kind, body, opts) when kind in [:hole, :counterbore, :countersink],
+    do: Smith.Features.Hole.evaluate(body, kind, opts)
 
   defp apply_operation(_, _, _), do: {:error, :invalid_operation}
+
+  defp modeling_frame(plane) do
+    plane =
+      case plane do
+        :xy -> Smith.Plane.xy()
+        :xz -> Smith.Plane.xz()
+        :yz -> Smith.Plane.yz()
+        other -> other
+      end
+
+    Smith.Plane.frame(plane)
+  end
 
   defp placed_primitive(op, args, opts, default_alignment) do
     with :ok <- options(opts, [:at, :align], []),
@@ -791,31 +1348,7 @@ defmodule Smith do
 
   defp selection_count(_, _), do: {:error, :invalid_options}
 
-  defp selected_edges(body, :all), do: OCEx.edges(body)
-
-  defp selected_edges(body, predicate) when is_function(predicate, 1) do
-    with {:ok, edges} <- OCEx.edges(body) do
-      Enum.reduce_while(edges, {:ok, []}, fn edge, {:ok, selected} ->
-        with {:ok, info} <- OCEx.edge_info(edge),
-             {:ok, bounds} <- OCEx.bounds(edge),
-             {:ok, sample} <- OCEx.edge_sample(edge, 0.5) do
-          case predicate.(Map.merge(info, %{bounds: bounds, midpoint: sample.point})) do
-            true -> {:cont, {:ok, selected ++ [edge]}}
-            false -> {:cont, {:ok, selected}}
-            _ -> {:halt, {:error, :invalid_selector_result}}
-          end
-        else
-          error -> {:halt, error}
-        end
-      end)
-    end
-  end
-
-  defp selected_edges(body, selector) do
-    with {:ok, axis} <- axis_index(selector),
-         {:ok, edges} <- OCEx.edges(body),
-         do: select_edges(edges, axis)
-  end
+  defp selected_edges(body, selector), do: Smith.Selector.select(body, :edges, selector)
 
   defp options(opts, allowed, required) do
     if is_list(opts) and Keyword.keyword?(opts) and
@@ -826,105 +1359,8 @@ defmodule Smith do
        else: {:error, :invalid_options}
   end
 
-  defp axis_index({:parallel, :x}), do: {:ok, 0}
-  defp axis_index({:parallel, :y}), do: {:ok, 1}
-  defp axis_index({:parallel, :z}), do: {:ok, 2}
-  defp axis_index(_), do: {:error, :invalid_options}
-
-  defp select_edges(edges, axis) do
-    Enum.reduce_while(edges, {:ok, []}, fn edge, {:ok, selected} ->
-      case OCEx.edge_info(edge) do
-        {:ok, %{type: :line, direction: direction}} ->
-          if abs(elem(direction, axis)) > 1 - 1.0e-9,
-            do: {:cont, {:ok, [edge | selected]}},
-            else: {:cont, {:ok, selected}}
-
-        {:ok, _} ->
-          {:cont, {:ok, selected}}
-
-        error ->
-          {:halt, error}
-      end
-    end)
-  end
-
-  defp hole_options(opts) do
-    with true <-
-           (opts[:on] == :top or match?(%{__struct__: Smith.Plane}, opts[:on])) and
-             opts[:through] == :all,
-         diameter when is_number(diameter) and diameter > 0 <- opts[:diameter],
-         {x, y} when is_number(x) and is_number(y) <- Keyword.get(opts, :at, {0, 0}) do
-      :ok
-    else
-      _ -> {:error, :invalid_options}
-    end
-  end
-
-  defp hole_tool(body, opts) do
-    if opts[:on] == :top do
-      with {:ok, face} <- top_face(body),
-           {:ok, {{_, _, bottom}, {_, _, top}}} <- OCEx.bounds(body),
-           {:ok, tool} <- OCEx.cylinder(opts[:diameter] / 2, top - bottom + 2),
-           {cx, cy, _} = face.center,
-           {dx, dy} = Keyword.get(opts, :at, {0, 0}),
-           do: OCEx.translate(tool, {cx + dx, cy + dy, bottom - 1})
-    else
-      alias Smith.Plane
-
-      with {:ok, frame} <- Plane.frame(opts[:on]),
-           {:ok, {low, high}} <- OCEx.bounds(body) do
-        center = Plane.point(frame, Keyword.get(opts, :at, {0, 0}))
-
-        distances =
-          for x <- [elem(low, 0), elem(high, 0)],
-              y <- [elem(low, 1), elem(high, 1)],
-              z <- [elem(low, 2), elem(high, 2)],
-              do: Plane.dot(Plane.sub({x, y, z}, center), frame.n)
-
-        bottom = Enum.min(distances) - 1
-        height = Enum.max(distances) + 1 - bottom
-
-        with {:ok, tool} <- OCEx.cylinder(opts[:diameter] / 2, height),
-             do:
-               Plane.place(tool, %{
-                 frame
-                 | origin: Plane.add(center, Plane.scale(frame.n, bottom))
-               })
-      end
-    end
-  end
-
-  defp top_face(body) do
-    with {:ok, faces} <- OCEx.faces(body) do
-      infos =
-        Enum.reduce_while(faces, {:ok, []}, fn face, {:ok, acc} ->
-          case OCEx.face_info(face) do
-            {:ok, %{type: :plane, normal: {_, _, z}} = info} when z > 1 - 1.0e-9 ->
-              {:cont, {:ok, [info | acc]}}
-
-            {:ok, _} ->
-              {:cont, {:ok, acc}}
-
-            error ->
-              {:halt, error}
-          end
-        end)
-
-      case infos do
-        {:ok, []} ->
-          {:error, :no_top_face}
-
-        {:ok, candidates} ->
-          highest = candidates |> Enum.map(&elem(&1.center, 2)) |> Enum.max()
-
-          case Enum.filter(candidates, &(abs(elem(&1.center, 2) - highest) < 1.0e-7)) do
-            [face] -> {:ok, face}
-            _ -> {:error, :ambiguous_top_face}
-          end
-
-        error ->
-          error
-      end
-    end
-  end
+  defp nonempty([]), do: {:error, :empty_selection}
+  defp nonempty(_), do: :ok
+  defp sweep_wire([wire]), do: {:ok, wire}
+  defp sweep_wire(_), do: {:error, :sweep_profile_has_holes}
 end

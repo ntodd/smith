@@ -90,7 +90,7 @@ files.print_pack
 files.parts
 ```
 
-The assembly result produces checked manufactured-part bundles, a geometry-only installed assembly STEP/BREP, a separate reference-only STEP, and `printables.zip` containing requested STL/3MF pairs. `installed: false` parts remain printable but stay out of the installed assembly. References never enter the print pack. STEP is a flat compound, not a named XCAF product tree; member identity remains in Smith results, filenames, and reports.
+The assembly result produces checked manufactured-part bundles, a geometry-only installed assembly STEP/BREP, a separate reference-only STEP, and `printables.zip` containing requested STL/3MF pairs. `installed: false` parts remain printable but stay out of the installed assembly. References never enter the print pack. STEP carries geometry without a named XCAF product tree; member identity remains in Smith results, filenames, and reports.
 
 Assembly options are `name:`, `formats:`, `tolerance:`, `angular_tolerance:`, `step_tolerance:`, `metadata:`, and `part_metadata:`. Print and display placement belong on each assembly part, not in these export options. `part_metadata:` maps member names to metadata maps. See [Assemblies](assemblies.md).
 
@@ -127,3 +127,9 @@ For a raw file:
 ```
 
 This overwrites the given file, requires the parent directory to exist, and does not perform bundle verification or update `current.json`. Raw STL uses OCEx defaults of 0.1 mm / 0.5 rad.
+
+## Two-dimensional views
+
+Use `Smith.Drawing.new/2` followed by `Smith.Drawing.write/3` for SVG or DXF.
+These drawing files have separate visible/hidden layers and millimeter coordinates.
+They are sampled views, not printable solid bundles. See [drawings](drawings.md).

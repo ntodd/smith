@@ -12,8 +12,8 @@ defmodule Smith.Sketch do
       iex> OCEx.shape_type(face.shape)
       {:ok, :face}
 
-  Use `Smith.extrude/2`, `Smith.revolve/4`, or `Smith.loft/1` to build
-  solid model recipes. A bare sketch evaluates to one face and cannot be
+  Use `Smith.extrude/2`, `Smith.revolve/4`, `Smith.loft/2`, or
+  `Smith.sweep/3` to build solid model recipes. A bare sketch evaluates to one face and cannot be
   exported as a printable bundle.
 
   Sketches have no constraint solver. Their local coordinates, dimensions,
@@ -64,6 +64,36 @@ defmodule Smith.Sketch do
     do: %__MODULE__{kind: :rectangle, data: {width, height}, options: opts}
 
   @doc """
+  Describes a rectangle with four circular corner rounds of `radius` mm.
+
+  Supports the placement options of `rectangle/3`. Equivalent to a rectangle
+  followed by `fillet/2`; rounding precedes subsequent cutouts. Radius must
+  be positive and smaller than half either dimension, allowing for native
+  tolerance. Use `slot/3` for semicircular ends meeting at the full width.
+  """
+  @spec rounded_rectangle(number(), number(), number(), keyword()) :: t()
+  def rounded_rectangle(width, height, radius, opts \\ []),
+    do: rectangle(width, height, opts) |> fillet(radius: radius)
+
+  @doc """
+  Describes a straight slot along local X with semicircular ends.
+
+  `length` is the overall end-to-end dimension; `width` is the diameter
+  of each end, both in mm. Length must be at least width, and width must
+  exceed 1.0e-7 mm. A nonzero straight span (length minus width) must also
+  exceed the native edge tolerance of 1.0e-7 mm. Equal dimensions produce
+  a circle. Smaller length or
+  invalid dimensions fail with `:invalid_sketch` at evaluation.
+
+  Supports `:on`, `:at`, and `:align` as in `rectangle/3`, defaulting
+  to centered alignment. `align: :none` also retains a centered outline.
+  Use `cut/2` to subtract this sketch from another outline.
+  """
+  @spec slot(number(), number(), keyword()) :: t()
+  def slot(length, width, opts \\ []),
+    do: %__MODULE__{kind: :slot, data: {length, width}, options: opts}
+
+  @doc """
   Describes a circle by radius in local millimeters.
 
   Radius must exceed the native tolerance of 1.0e-7 mm at evaluation.
@@ -92,9 +122,9 @@ defmodule Smith.Sketch do
   def polygon(points, opts \\ []), do: %__MODULE__{kind: :polygon, data: points, options: opts}
 
   @doc """
-  Describes a closed outline made from local lines and circular arcs.
+  Describes a closed outline made from local lines, circular arcs, and interpolated splines.
 
-  Supply a nonempty list of `line/2` and `arc/4` descriptions in connected
+  Supply a nonempty list of `line/2`, `arc/4`, and `spline/2` descriptions in connected
   boundary order. Options are `:on` and `:at` as in `rectangle/3`.
   Coordinates are retained and shifted by `:at`; `:align` is not accepted.
   Open, disconnected, and invalid boundaries fail during evaluation.
@@ -135,6 +165,23 @@ defmodule Smith.Sketch do
   """
   @spec arc({number(), number()}, number(), number(), number()) :: tuple()
   def arc(center, radius, start, sweep), do: {:arc, center, radius, start, sweep}
+
+  @doc """
+  Returns a nonperiodic interpolated B-spline description for `profile/2`.
+
+  Supply at least two distinct local `{u, v}` points in traversal order.
+  The curve passes through these points, not through a control polygon.
+  Optional `tangents` is a pair of nonzero local direction vectors at the
+  first and last point. Directions are mapped through the sketch plane
+  without translation; OCCT chooses their derivative magnitudes.
+
+  The curve need not remain inside the points' bounds. Invalid points,
+  tangents, and degenerate interpolation fail during sketch evaluation.
+  Close the outline with other edges before extruding or sweeping it.
+  """
+  @spec spline([{number(), number()}], {{number(), number()}, {number(), number()}} | nil) ::
+          tuple()
+  def spline(points, tangents \\ nil), do: {:spline, points, tangents}
 
   @doc """
   Places a sketch on a new plane, preserving its local coordinates.
@@ -281,6 +328,38 @@ defmodule Smith.Sketch do
 
   def extrude(_, _), do: {:error, :invalid_extrusion}
 
+  @doc false
+  def extrude(sketch, height, opts) when is_number(height) and height != 0 do
+    if Plane.keywords?(opts, [:both, :taper]) and
+         is_boolean(Keyword.get(opts, :both, false)) and
+         is_number(Keyword.get(opts, :taper, 0)) do
+      if not Keyword.get(opts, :both, false) and Keyword.get(opts, :taper, 0) == 0 do
+        extrude(sketch, height)
+      else
+        with {:ok, _, frame} <- prepare(sketch),
+             {:ok, face} <- evaluate(sketch),
+             do: OCEx.extrude(face, Plane.scale(frame.n, height), opts)
+      end
+    else
+      {:error, :invalid_options}
+    end
+  end
+
+  def extrude(_, _, _), do: {:error, :invalid_extrusion}
+
+  @doc false
+  def extrude_until(sketch, target, opts) do
+    with {:ok, _, frame} <- prepare(sketch),
+         {:ok, face} <- evaluate(sketch),
+         do:
+           OCEx.extrude_until(
+             face,
+             Keyword.get(opts, :direction, frame.n),
+             target.origin,
+             target.n
+           )
+  end
+
   defp prepare(sketch, inherited \\ nil)
 
   defp prepare(%__MODULE__{} = sketch, inherited) do
@@ -319,6 +398,32 @@ defmodule Smith.Sketch do
     with {:ok, [{lx, ly}, _]} <-
            align([{-radius, -radius}, {radius, radius}], opts, {:center, :center}),
          do: {:ok, %{kind: :circle, radius: radius, center: {lx + radius, ly + radius}}}
+  end
+
+  defp base(:slot, {length, width}, opts)
+       when is_number(length) and is_number(width) and length >= width and width > 1.0e-7 do
+    if length == width do
+      base(:circle, width / 2, opts)
+    else
+      with {:ok, [{x, y}, _]} <-
+             align([{-length / 2, -width / 2}, {length / 2, width / 2}], opts, {:center, :center}) do
+        r = width / 2
+        left = {x + r, y + r}
+        right = {x + length - r, y + r}
+
+        {:ok,
+         %{
+           kind: :profile,
+           offset: {0, 0},
+           edges: [
+             line({x + r, y}, {x + length - r, y}),
+             arc(right, r, -90, 180),
+             line({x + length - r, y + width}, {x + r, y + width}),
+             arc(left, r, 90, 180)
+           ]
+         }}
+      end
+    end
   end
 
   defp base(:polygon, points, opts) when is_list(points) and length(points) >= 3 do
@@ -412,7 +517,30 @@ defmodule Smith.Sketch do
       else: {:error, :invalid_profile}
   end
 
+  defp edge({:spline, points, tangents}, frame) do
+    with true <- is_list(points) and Enum.all?(points, &point?/1),
+         {:ok, tangents} <- spline_tangents(tangents, frame) do
+      OCEx.spline(Enum.map(points, &Plane.point(frame, &1)), tangents)
+    else
+      false -> {:error, :invalid_profile}
+      error -> error
+    end
+  end
+
   defp edge(_, _), do: {:error, :invalid_profile}
+
+  defp spline_tangents(nil, _), do: {:ok, nil}
+
+  defp spline_tangents({a, b}, frame) do
+    if point?(a) and point?(b) do
+      local = fn {u, v} -> Plane.add(Plane.scale(frame.u, u), Plane.scale(frame.v, v)) end
+      {:ok, {local.(a), local.(b)}}
+    else
+      {:error, :invalid_profile}
+    end
+  end
+
+  defp spline_tangents(_, _), do: {:error, :invalid_profile}
 
   defp rounded(points, radius) do
     points = if area(points) < 0, do: Enum.reverse(points), else: points

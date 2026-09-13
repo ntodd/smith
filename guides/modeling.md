@@ -74,6 +74,8 @@ end
 model = Smith.box(20, 10, 4) |> Smith.fillet(edges: round_vertical, radius: 1, count: 4)
 ```
 
+For reusable selections, compose `Smith.Selector` filters such as `Selector.type(:line) |> Selector.parallel(:z)`. The same selector machinery supports face queries and shell openings. `Smith.edges(result, selector)` and `Smith.faces(result, selector)` inspect evaluated geometry.
+
 Use `count:` when the design expects a particular number of edges. Unexpected counts fail rather than rounding unintended geometry. Avoid relying on enumeration order; topology can change after booleans and cleanup. Predicates must return booleans, and exceptions in your own callbacks propagate.
 
 Finishing order is part of design intent. Filleting an outside edge before drilling can differ from filleting all edges after drilling. Keep those choices in named feature functions.
@@ -101,7 +103,7 @@ faces share the highest elevation, `on: :top` fails with
 
 `Smith.line/2`, `arc/6`, and `spline/2` describe world-coordinate edges. `Smith.profile/1` joins ordered edges into a closed planar face. `Smith.polygon/1` creates a planar face from world-coordinate points. Extrude a face recipe with a world vector.
 
-Prefer `Smith.Sketch` for local 2D outlines. Its signed scalar extrusion, full/partial revolve, and ruled loft are covered in [Sketches and planes](sketches.md). A ruled loft joins each adjacent section directly and offers no guide rails or smooth transitions.
+Prefer `Smith.Sketch` for local 2D outlines. Its signed scalar extrusion, full/partial revolve, and loft are covered in [Sketches and planes](sketches.md). See [paths, lofts, and shells](paths-and-shells.md) for open paths, smooth interpolation, sweeps, and hollowing.
 
 ## Evaluation and branching
 
@@ -112,3 +114,5 @@ drilled = base |> Smith.hole(on: :top, diameter: 3, through: :all)
 ```
 
 All three recipes remain independent. Native geometry is immutable too. The evaluated `revision` is a SHA-256 hash of serialized BREP, useful for export identity and detecting stale results. It is not promised to remain identical across kernel versions or platforms, and it is not a parametric editing format. Keep the Elixir recipe as the design source.
+
+For measured filters, sorting, topology metadata, mirrored parts, blind holes, and recessed fasteners, see [mechanical parts](mechanical-parts.md).

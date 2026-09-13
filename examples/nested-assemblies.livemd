@@ -1,0 +1,122 @@
+# Smith — Reusable subassemblies
+
+```elixir
+Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Before you start
+
+Install the pinned native toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the runtime after changing native code. Units below are millimeters and degrees.
+
+This notebook defines one mounting module, places it twice, and exports each manufactured leaf separately. Earlier recipes remain reusable. Each preview supports rotation, zoom, fullscreen, and PNG download.
+
+## Define the parts
+
+The base has two counterbored mounting holes. A removable spacer sits above its center. The device is reference geometry, and the small fit coupon is printable but not installed. The bores use an explicit plane so their coordinates do not depend on a changing face centroid.
+
+```elixir
+alias Smith.{Assembly, Plane, Sketch}
+
+base = Sketch.rounded_rectangle(30, 20, 2) |> Smith.extrude(4)
+base = for x <- [-10, 10], reduce: base do
+  body -> Smith.counterbore(body, on: Plane.xy(z: 4), at: {x, 0},
+    diameter: 3, bore_diameter: 6, bore_depth: 2, through: :all)
+end
+spacer = Smith.cylinder(4, 6)
+coupon = Smith.box(8, 8, 2) |> Smith.hole(on: :top, diameter: 3, through: :all)
+device = Smith.box(20, 12, 5, align: {:center, :center, :min})
+
+Smith.Kino.render(base, label: "1 · Counterbored base")
+```
+
+## Define a module
+
+Positions here belong to the module's local frame. `print:` belongs to each manufactured part; `on_bed: true` centers its final world shape on the bed when exporting. A rotated parent can change a part's print orientation, so specify a print rotation if that is needed for your design.
+
+```elixir
+mount = Assembly.new(:mount)
+  |> Assembly.part(:base, base, print: [on_bed: true])
+  |> Assembly.part(:spacer, spacer, position: {0, 0, 4}, print: [on_bed: true],
+    exploded_offset: {0, 0, 8})
+  |> Assembly.part(:coupon, coupon, installed: false, print: [on_bed: true],
+    display_offset: {0, -20, 0})
+  |> Assembly.reference(:device, device, position: {0, 0, 10})
+
+{:ok, module_result} = Smith.evaluate(mount)
+{:ok, solids} = OCEx.solids(module_result.shape)
+2 = length(solids)
+Smith.Kino.render(module_result, label: "2 · One mounting module")
+```
+
+## Place two instances
+
+`subassembly` preserves the module's tree. Local transforms apply first, then the parent rotation and translation. The right module turns 90° around Z before moving to X=25. Equal leaf recipes are evaluated once across the whole tree in this evaluation.
+
+```elixir
+pair = Assembly.new(:mount_pair)
+  |> Assembly.subassembly(:left, mount, position: {-25, 0, 0})
+  |> Assembly.subassembly(:right, mount,
+    rotation: {{0, 0, 1}, 90}, position: {25, 0, 0})
+
+{:ok, result} = Smith.evaluate(pair)
+{:ok, solids} = OCEx.solids(result.shape)
+4 = length(solids)
+Smith.Kino.render(result, label: "3 · Two placed modules")
+```
+
+## Inspect a branch or leaf
+
+A path can be a list of names or a slash-separated string. Fetching a branch returns an assembly result, while a leaf returns a normal Smith result. Both retain final world coordinates. A bare name searches only the current level; names are unique among siblings.
+
+```elixir
+{:ok, right} = Assembly.fetch(result, :right)
+{:ok, right_spacer} = Assembly.fetch(result, [:right, :spacer])
+{:ok, ^right_spacer} = Assembly.fetch(result, "right/spacer")
+{:ok, {low, high}} = OCEx.bounds(right_spacer.shape)
+true = abs(elem(low, 0) - 21) < 1.0e-7
+true = abs(elem(high, 2) - 10) < 1.0e-7
+
+Smith.Kino.render(right, label: "4 · Right module in world coordinates")
+```
+
+`Assembly.members/1` visits all leaves in depth-first order. Its `installed` flag accounts for every ancestor. Marking a subassembly `installed: false` leaves its manufactured parts printable while excluding the entire branch from the installed compound. References never become printable parts.
+
+```elixir
+{:ok, members} = Assembly.members(result)
+8 = length(members)
+4 = Enum.count(members, & &1.installed)
+6 = Enum.count(members, &(&1.kind == :part))
+members
+|> Enum.map(fn member -> %{path: member.key, kind: member.kind, installed: member.installed} end)
+|> Kino.DataTable.new()
+```
+
+## Inspect all manufactured leaves
+
+The exploded view includes both coupons and lifts each spacer by 8 mm. Offsets
+are world vectors even in the rotated right module. The evaluated placement is
+retained, and references are excluded. Export the original result below.
+
+```elixir
+{:ok, exploded} = Assembly.view(result, :exploded)
+{:ok, solids} = OCEx.solids(exploded.shape)
+6 = length(solids)
+Smith.Kino.render(exploded, label: "5 · Exploded modules and coupons")
+```
+
+## Export the tree and printable leaves
+
+Export creates six STL/3MF pairs, a combined installed STEP, a reference-only STEP, and a JSON report retaining the tree. Paths use `/` for lookup and report identity; filenames join normalized path segments with `__`, such as `mount-pair-left__base.stl`. A name's underscores normalize to hyphens, so this separator cannot collide with a single normalized segment.
+
+```elixir
+{:ok, files} = Smith.export(result, "output/models", name: "mount-pair",
+  angular_tolerance: 0.1,
+  part_metadata: %{[:left, :base] => %{note: "Left module mounting plate"}})
+6 = length(files.parts)
+{:ok, archive} = :zip.extract(File.read!(files.print_pack), [:memory])
+12 = length(archive)
+true = Enum.all?(files.parts, & &1.verification.mesh.watertight)
+Kino.Text.new(files.print_pack)
+```
+
+Display and exploded offsets are world vectors accumulated from the branch to each leaf. Direct assembly previews show installed geometry. `Assembly.view/2` applies the offsets explicitly for display or exploded previews. The STEP contains geometry without named XCAF product instances or materials. The JSON tree preserves Smith's membership and placement data. There is no mating or motion solver in this example: all placement is explicit.
