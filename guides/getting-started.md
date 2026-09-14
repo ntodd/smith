@@ -41,6 +41,10 @@ end
 IO.puts(files.three_mf)
 ```
 
+<div class="smith-doc-preview" data-preview="getting-started-1-part" data-model="part" data-label="Mounting plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 `build/3` returns an immutable `Smith.Model`. Native operations run at evaluation. Reusing a recipe does not mutate the original or share a mutable modeling context.
 
 Use a struct for parameters when a design has many dimensions; pass it to feature functions. Ordinary `Enum.map`, comprehensions, and pipelines are enough for patterns and assembly construction. Parameter values do not need a separate schema or framework.
@@ -65,6 +69,10 @@ Bare sketches evaluate to faces, which can be inspected with `OCEx.area/1`. Extr
 {:ok, bounds} = OCEx.bounds(part.shape)
 {:ok, solids} = OCEx.solids(part.shape)
 ```
+
+<div class="smith-doc-preview" data-preview="getting-started-2-part" data-model="part" data-label="Measured part">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Queries return tagged results. Dimensions use millimeters, volumes cubic millimeters, and modeling angles degrees. Meshing angles use radians. Start with verified export defaults, then adjust mesh tolerances when necessary; see [Exporting](exporting.md).
 

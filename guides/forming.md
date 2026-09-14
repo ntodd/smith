@@ -15,6 +15,10 @@ tapered = Smith.box(20, 16, 10)
 {:ok, result} = Smith.evaluate(tapered)
 ```
 
+<div class="smith-doc-preview" data-preview="forming-0-tapered" data-model="tapered" data-label="Drafted block">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 At the neutral plane, the footprint stays fixed. Positive angles remove material
 on the pull side. `direction:` defaults to the plane normal; it must not lie in
 the neutral plane. Angles are degrees and must be strictly between −90 and 90.
@@ -36,6 +40,22 @@ cap = tapered
   |> Smith.translate({0, 0, -6})
   |> Smith.extrude({0, 0, 2})
 ```
+
+<div class="smith-doc-preview" data-preview="forming-1-lower" data-model="lower" data-label="Lower split">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="forming-1-upper" data-model="upper" data-label="Upper split">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="forming-1-both" data-model="both" data-label="Both split solids">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="forming-1-cap" data-model="cap" data-label="Extruded section">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Positive means the side toward the plane normal. The default `keep: :both` keeps
 separate solids; it does not fuse the cut back together. These operations accept
@@ -59,6 +79,18 @@ true = abs(volume - :math.pi() * (144 - 121) * 12) < 1.0e-5
 
 expanded = Smith.box(20, 16, 10) |> Smith.offset(2, join: :intersection)
 ```
+
+<div class="smith-doc-preview" data-preview="forming-2-wall" data-model="wall" data-label="Cylindrical surface">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="forming-2-sleeve" data-model="sleeve" data-label="Offset and thickened sleeve">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="forming-2-expanded" data-model="expanded" data-label="Offset block">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 `surface` selects faces and sews their shared boundaries. An empty selection fails.
 Connected faces become shells; disconnected regions stay separate. The cylinder

@@ -28,6 +28,10 @@ plate = Smith.box(40, 20, 4, align: {:center, :center, :min})
 model = plate |> Smith.fuse(boss)
 ```
 
+<div class="smith-doc-preview" data-preview="modeling-0-model" data-model="model" data-label="Plate and boss">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 To describe a centered footprint between two elevations, keep the height explicit:
 
 ```elixir
@@ -36,6 +40,10 @@ top = 14
 body = Smith.box(30, 20, top - bottom,
   at: {12, -8, bottom}, align: {:center, :center, :min})
 ```
+
+<div class="smith-doc-preview" data-preview="modeling-1-body" data-model="body" data-label="Positioned block">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Use sketches for local 2D outlines and arbitrary planes; their `at:` uses two local coordinates, while
 solid primitive `at:` uses three world coordinates.
@@ -51,6 +59,10 @@ bores = for x <- [-12, 12], do: Smith.cylinder(2, 6, at: {x, 0, -1})
 model = plate |> Smith.cut(bores)
 ```
 
+<div class="smith-doc-preview" data-preview="modeling-2-model" data-model="model" data-label="Boolean cuts">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Extend cutting tools past the surface when the intended feature is through-all; this avoids relying on coincident faces. Alternatively use `Smith.hole/2` with `through: :all`, which sizes its cutter across the complete body.
 
 A missed Boolean tool can be a no-op; a missed `hole/2` fails explicitly. Disjoint unions can contain multiple solids. `Smith.compound/1` groups shapes without fusing and preserves separate boundaries. For separately named and printable parts, use [assemblies](assemblies.md).
@@ -64,6 +76,10 @@ model =
   |> Smith.hole(on: :top, diameter: 8, through: :all)
 ```
 
+<div class="smith-doc-preview" data-preview="modeling-3-model" data-model="model" data-label="Fillet and hole">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Fillet/chamfer selectors run against the body at that evaluation step. `{:parallel, axis}` selects straight edges parallel to the world axis; curved edges are not included. `edges: :all` selects all edges. A predicate receives native edge information together with its world bounds and a point at the middle of its parameter interval. For a spline, that point need not divide its length in half:
 
 ```elixir
@@ -73,6 +89,10 @@ end
 
 model = Smith.box(20, 10, 4) |> Smith.fillet(edges: round_vertical, radius: 1, count: 4)
 ```
+
+<div class="smith-doc-preview" data-preview="modeling-4-model" data-model="model" data-label="Selected vertical fillets">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 For reusable selections, compose `Smith.Selector` filters such as `Selector.type(:line) |> Selector.parallel(:z)`. The same selector machinery supports face queries and shell openings. `Smith.edges(result, selector)` and `Smith.faces(result, selector)` inspect evaluated geometry.
 
@@ -94,6 +114,10 @@ model =
   |> Smith.hole(on: Smith.Plane.xy(), at: {50, 20}, diameter: 4, through: :all)
 ```
 
+<div class="smith-doc-preview" data-preview="modeling-5-model" data-model="model" data-label="Fixed hole positions">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The plane supplies a frame and drill direction; it does not need to coincide
 with a face. The cutter spans the body's projected bounds. If several top
 faces share the highest elevation, `on: :top` fails with
@@ -112,6 +136,18 @@ base = Smith.box(20, 10, 4)
 rounded = base |> Smith.fillet(edges: {:parallel, :z}, radius: 1)
 drilled = base |> Smith.hole(on: :top, diameter: 3, through: :all)
 ```
+
+<div class="smith-doc-preview" data-preview="modeling-6-base" data-model="base" data-label="Base">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="modeling-6-rounded" data-model="rounded" data-label="Rounded variant">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="modeling-6-drilled" data-model="drilled" data-label="Drilled variant">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 All three recipes remain independent. Native geometry is immutable too. The evaluated `revision` is a SHA-256 hash of serialized BREP, useful for export identity and detecting stale results. It is not promised to remain identical across kernel versions or platforms, and it is not a parametric editing format. Keep the Elixir recipe as the design source.
 

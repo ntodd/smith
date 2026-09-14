@@ -14,6 +14,10 @@ defmodule Smith.Selector do
       iex> length(faces)
       1
 
+  <div class="smith-doc-preview" data-preview="api-selector-0" data-model="faces" data-label="Selected top face">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   Use these values in `Smith.fillet/2`, `Smith.chamfer/2`, or
   `Smith.shell/2` to resolve a selection at that recipe step.
   `Smith.edges/2` and `Smith.faces/2` inspect an already evaluated result.

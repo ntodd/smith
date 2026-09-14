@@ -22,6 +22,18 @@ plate = Sketch.rounded_rectangle(50, 30, 3)
 {:ok, front} = Drawing.new(part, on: :xz)
 ```
 
+<div class="smith-doc-preview" data-preview="drawings-0-part" data-model="part" data-label="Counterbored plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="drawings-0-top" data-model="top" data-label="Top drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="drawings-0-front" data-model="front" data-label="Front drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The normal points toward the viewer; the viewing direction is its negative.
 Plane-local X points right and plane-local Y points up.
 
@@ -41,6 +53,14 @@ view = Plane.new(normal: {1, -1, 1}, x_direction: {1, 1, 0})
 {:ok, shifted} = Drawing.new(part, on: Plane.xy(origin: {10, 5, 100}))
 ```
 
+<div class="smith-doc-preview" data-preview="drawings-1-oblique" data-model="oblique" data-label="Oblique drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="drawings-1-shifted" data-model="shifted" data-label="Shifted top drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Sharp boundaries and silhouettes are included. `tangents: true` additionally
 includes smooth G1 boundaries between faces, which can help explain fillets.
 Surface seams and isoparametric lines are omitted.
@@ -58,6 +78,10 @@ true = visible_edges != []
 true = lines.hidden != []
 ```
 
+<div class="smith-doc-preview" data-preview="drawings-2-front" data-model="front" data-label="Sampled front drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Each returned polyline represents one edge. Closed edges repeat their endpoint.
 Edges are not joined into loops, and coincident projections are not merged.
 An edge viewed exactly end-on has no line extent and is omitted. Empty layers
@@ -72,6 +96,10 @@ then leave the image as the cell's last value:
 {:ok, svg} = Drawing.svg(top, hidden: false, title: "Plate · Top")
 Kino.Image.new(svg, :svg)
 ```
+
+<div class="smith-doc-preview" data-preview="drawings-3-svg" data-model="svg" data-label="Visible top edges">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 This is a static 2D drawing. `Smith.Kino.render(part)` provides the rotatable 3D
 view. Use both when inspecting a model. The
@@ -93,6 +121,14 @@ File.mkdir_p!(directory)
 {:ok, dxf_path} = Drawing.write(front, Path.join(directory, "front.dxf"),
   tolerance: 0.01)
 ```
+
+<div class="smith-doc-preview" data-preview="drawings-4-top" data-model="top" data-label="Exported top drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="drawings-4-front" data-model="front" data-label="Exported front drawing">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 `write/3` infers the format from the extension. It requires an existing parent
 directory and overwrites an existing file only after serialization succeeds.

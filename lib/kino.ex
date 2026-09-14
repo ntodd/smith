@@ -20,12 +20,12 @@ defmodule Smith.Kino do
   @doc """
   Creates an interactive preview and returns the Kino directly.
 
-  Accepts a model, sketch, assembly, evaluated result, or `{:ok, result}`
+  Accepts a model, sketch, path, assembly, evaluated result, or `{:ok, result}`
   from `Smith.evaluate/1` or `Smith.Assembly.view/2`. Recipes are
   evaluated on each call; passing an existing result skips that step.
   The shape is then meshed into a snapshot. Assemblies show installed
-  manufactured parts only. Sketches show their faces; edge-only recipes
-  have no triangle surface to display.
+  manufactured parts only. Sketches show their faces; paths and edge-only
+  recipes show sampled curves. A mixed shape with faces displays its surfaces.
 
   ## Options
 
@@ -45,14 +45,24 @@ defmodule Smith.Kino do
 
   Leave the render call as the cell's last expression:
 
-      iex> preview = Smith.Kino.render(Smith.box(20, 10, 4), label: "Blank")
+      iex> blank = Smith.box(20, 10, 4)
+      iex> preview = Smith.Kino.render(blank, label: "Blank")
       iex> is_struct(preview, Kino.JS)
       true
 
+  <div class="smith-doc-preview" data-preview="api-kino-0" data-model="blank" data-label="Blank">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   Evaluation results can be piped straight into the preview:
 
-      iex> Smith.box(20, 10, 4) |> Smith.evaluate() |> Smith.Kino.render() |> is_struct(Kino.JS)
+      iex> blank = Smith.box(20, 10, 4)
+      iex> blank |> Smith.evaluate() |> Smith.Kino.render() |> is_struct(Kino.JS)
       true
+
+  <div class="smith-doc-preview" data-preview="api-kino-1" data-model="blank" data-label="Piped evaluation">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
 
   Use `Kino.render/1` to display an additional preview before the cell's
   final expression. Drag to rotate, scroll to zoom, and use the toolbar for
@@ -69,6 +79,7 @@ defmodule Smith.Kino do
   """
   @spec render(
           Smith.Model.t()
+          | Smith.Path.t()
           | Smith.Sketch.t()
           | Smith.Assembly.t()
           | Smith.Result.t()
@@ -89,20 +100,8 @@ defmodule Smith.Kino do
     with :ok <- available(),
          :ok <- options(opts),
          {:ok, result} <- result(model),
-         {:ok, mesh} <-
-           OCEx.mesh(
-             result.shape,
-             Keyword.get(opts, :tolerance, 0.03),
-             Keyword.get(opts, :angular_tolerance, 0.5)
-           ) do
-      apply(Smith.Kino.Renderer, :new, [
-        %{
-          vertices: Enum.map(mesh.vertices, &Tuple.to_list/1),
-          triangles: Enum.map(mesh.triangles, &Tuple.to_list/1),
-          revision: result.revision,
-          label: Keyword.get(opts, :label, "Smith preview")
-        }
-      ])
+         {:ok, data} <- Smith.Kino.Data.build(result, opts) do
+      apply(Smith.Kino.Renderer, :new, [data])
     end
   end
 

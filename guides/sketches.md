@@ -20,6 +20,10 @@ model =
 {:ok, files} = Smith.export(result, "output", name: "mount", on_bed: true)
 ```
 
+<div class="smith-doc-preview" data-preview="sketches-0-result" data-model="result" data-label="Mounting plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 ## Frames
 
 | Constructor      | World origin | Local X | Local Y | Normal |
@@ -41,7 +45,12 @@ plane = Plane.new(
 
 {:ok, world_point} = Plane.to_world(plane, {5, 8})
 {:ok, unit_normal} = Plane.normal(plane)
+oriented = Sketch.rectangle(10, 16, on: plane)
 ```
+
+<div class="smith-doc-preview" data-preview="sketches-1-oriented" data-model="oriented" data-label="Sketch on an inclined plane">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 `new/1` defaults to world origin, +Z normal, and +X direction. It normalizes the normal, projects X onto the plane, and derives local Y from their cross product. Zero directions and an X direction parallel to the normal are invalid. Supply an appropriate `x_direction:` when the default +X would be parallel. Frame queries return tagged results; model evaluation reports invalid frames as Smith errors. Distances are millimeters and sketch arc angles are degrees.
 
@@ -56,15 +65,23 @@ All accept `on: plane` and `at: {u, v}`. Rectangles, circles, and polygons also 
 
 ```elixir
 # X bounds 10..14, Y bounds 14..20.
-Sketch.rectangle(4, 6, align: {:min, :max}, at: {10, 20})
+rectangle = Sketch.rectangle(4, 6, align: {:min, :max}, at: {10, 20})
 
 # A semicircle authored in 2D, placed on a side plane.
-Sketch.profile([
+semicircle = Sketch.profile([
   Sketch.arc({0, 0}, 2, 0, 180),
   Sketch.line({-2, 0}, {2, 0})
 ], on: Plane.yz(x: 10))
 |> Smith.extrude(3)
 ```
+
+<div class="smith-doc-preview" data-preview="sketches-2-rectangle" data-model="rectangle" data-label="Aligned rectangle">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="sketches-2-semicircle" data-model="semicircle" data-label="Extruded semicircle">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 `Sketch.line/2`, `arc/4`, and `spline/2` return edge descriptions for `profile/2`. Arc arguments are center, radius, start angle, and signed sweep. Positive angles turn counterclockwise in the local XY frame. Closure and topology are checked by the native kernel.
 
@@ -75,6 +92,14 @@ outline = Sketch.rectangle(20, 10)
 front = outline |> Smith.extrude(3)
 side = outline |> Sketch.on(Plane.yz(x: 25)) |> Smith.extrude(3)
 ```
+
+<div class="smith-doc-preview" data-preview="sketches-3-front" data-model="front" data-label="Front profile">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="sketches-3-side" data-model="side" data-label="Side profile">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 ## Corners and extrusion
 
@@ -104,6 +129,14 @@ plate =
   |> Smith.extrude(5)
 ```
 
+<div class="smith-doc-preview" data-preview="sketches-4-ring" data-model="ring" data-label="Ring">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="sketches-4-plate" data-model="plate" data-label="Side plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 `Sketch.cut/2` accepts a sketch or an ordered list. An empty list returns the original sketch. Cutters can overlap, contain their own cutouts, meet the outer edge, or miss it entirely. Subtraction uses set semantics: repeated cuts do not remove material twice, and a missed cut leaves the region unchanged.
 
 A cutter without `on:` or `Sketch.on/2` inherits its parent's frame, including in nested cuts. Its `at:` offset is relative to that frame's origin, independent of the parent's alignment or `at:`. Moving the parent with `Sketch.on/2` also moves these inherited cutters. A cutter with an explicit plane keeps that world placement; it must be coplanar with its parent at evaluation. Coplanar frames may have different origins, in-plane axes, or opposite normals. There is no implicit projection between different planes.
@@ -124,6 +157,14 @@ transition =
     Sketch.rectangle(20, 10, on: Plane.xy(z: 30))
   ])
 ```
+
+<div class="smith-doc-preview" data-preview="sketches-5-sleeve" data-model="sleeve" data-label="Revolved sleeve">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="sketches-5-transition" data-model="transition" data-label="Rectangular loft">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 `Smith.revolve(profile, axis, degrees \\ 360, origin \\ {0, 0, 0})` accepts a sketch, including cutouts, or an existing world-coordinate face recipe. Axis and origin are world coordinates, consistent with `Smith.rotate/4`. Angles must be greater than zero and at most 360 degrees; reverse the axis vector for the opposite direction. Place the cross-section on one side of the rotation axis so its sweep forms a valid solid. Partial revolutions include end faces.
 

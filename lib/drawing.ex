@@ -12,6 +12,10 @@ defmodule Smith.Drawing do
       iex> String.starts_with?(svg, "<svg")
       true
 
+  <div class="smith-doc-preview" data-preview="api-drawing-0" data-model="svg" data-label="Top drawing">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   Use \x60Smith.Kino.render/2\x60 for a rotatable 3D preview. In Livebook, display
   a drawing with \x60Kino.Image.new(svg, :svg)\x60. See the
   [drawing guide](drawings.html) for view orientation and file export.

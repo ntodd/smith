@@ -14,6 +14,10 @@ files.three_mf
 files.verification.mesh
 ```
 
+<div class="smith-doc-preview" data-preview="exporting-0-result" data-model="result" data-label="Exported block">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 A bundle is written below `output/<name>/<geometry_revision>/<export_id>/`. It includes `model.step`, `model.brep`, `model.stl`, `model.3mf`, `model.json`, and `verification.json`. Each export gets a unique ID, even when geometry is unchanged. The root `current.json` points to the latest verified exports; old directories are preserved.
 
 The returned record includes `name`, `revision`, `export_id`, `step`, `stl`, `three_mf`, `volume`, display `mesh`, and `verification`. Paths for unrequested formats are `nil`.
@@ -45,7 +49,14 @@ The returned record includes `name`, `revision`, `export_id`, `step`, `stl`, `th
   tolerance: 0.02,
   angular_tolerance: 0.1
 )
+
+# The exported STL, in its print orientation.
+print_model = files.stl |> File.read!() |> Smith.Mesh.from_stl()
 ```
+
+<div class="smith-doc-preview" data-preview="exporting-1-print-model" data-model="print_model" data-label="Print orientation">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Smaller deflection values generally produce more triangles and larger files. `tolerance:` is not a dimensional offset or printer clearance. Model clearances explicitly in the design. 3MF contains millimeter geometry; it is not a configured printer project.
 
@@ -90,6 +101,10 @@ files.print_pack
 files.parts
 ```
 
+<div class="smith-doc-preview" data-preview="exporting-2-assembly" data-model="assembly" data-label="Exported enclosure">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The assembly result produces checked manufactured-part bundles, a geometry-only installed assembly STEP/BREP, a separate reference-only STEP, and `printables.zip` containing requested STL/3MF pairs. `installed: false` parts remain printable but stay out of the installed assembly. References never enter the print pack. STEP carries geometry without a named XCAF product tree; member identity remains in Smith results, filenames, and reports.
 
 Assembly options are `name:`, `formats:`, `tolerance:`, `angular_tolerance:`, `step_tolerance:`, `metadata:`, and `part_metadata:`. Print and display placement belong on each assembly part, not in these export options. `part_metadata:` maps member names to metadata maps. See [Assemblies](assemblies.md).
@@ -125,6 +140,10 @@ For a raw file:
 ```elixir
 {:ok, :ok} = Smith.export(result, "block.step")
 ```
+
+<div class="smith-doc-preview" data-preview="exporting-3-result" data-model="result" data-label="STEP geometry">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 This overwrites the given file, requires the parent directory to exist, and does not perform bundle verification or update `current.json`. Raw STL uses OCEx defaults of 0.1 mm / 0.5 rad.
 

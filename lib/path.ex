@@ -12,6 +12,10 @@ defmodule Smith.Path do
       iex> OCEx.length(wire.shape)
       {:ok, 10.0}
 
+  <div class="smith-doc-preview" data-preview="api-path-0" data-model="wire" data-label="Straight path">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   A path evaluates to a wire, not a printable solid. Pass it to
   `Smith.sweep/3` with a placed sketch to create one. Paths do not currently
   support closed loops or automatic profile placement. A connected path can

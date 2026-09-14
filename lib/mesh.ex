@@ -80,6 +80,10 @@ defmodule Smith.Mesh do
       iex> {report.watertight, report.winding_consistent, report.components,
       ...>  report.volume}
       {true, true, 1, 24.0}
+
+  <div class="smith-doc-preview" data-preview="api-mesh-0" data-model="raw" data-label="Inspected mesh">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec inspect(map()) :: map()
   def inspect(%{vertices: vertices, triangles: triangles}) do
@@ -188,6 +192,10 @@ defmodule Smith.Mesh do
       iex> mesh = raw |> Smith.Mesh.to_stl() |> Smith.Mesh.from_stl()
       iex> {length(mesh.vertices), length(mesh.triangles)}
       {8, 12}
+
+  <div class="smith-doc-preview" data-preview="api-mesh-1" data-model="mesh" data-label="STL round trip">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec from_stl(binary()) :: map()
   def from_stl(<<_header::binary-size(80), count::little-32, records::binary>>)

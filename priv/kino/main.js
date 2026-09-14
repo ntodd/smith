@@ -25,7 +25,10 @@ export function init(ctx, data) {
   canvas.setAttribute("aria-label", `${data.label}: drag to rotate, scroll to zoom`);
   canvas.style.cssText = "display:block;width:100%;touch-action:none;cursor:grab";
   const caption = document.createElement("div"); caption.style.cssText = "padding:8px 12px;background:#f8fafc;font-size:12px;flex-shrink:0";
-  caption.textContent = `${data.triangles.length.toLocaleString()} triangles · ${data.revision.slice(0, 12)} · Drag to rotate · Scroll to zoom`;
+  const geometry = data.triangles.length
+    ? `${data.triangles.length.toLocaleString()} triangles`
+    : `${(data.lines || []).length} curves`;
+  caption.textContent = `${geometry} · ${data.revision.slice(0, 12)} · Drag to rotate · Scroll to zoom`;
   const status = document.createElement("div"); status.setAttribute("role", "status"); status.hidden = true;
   status.style.cssText = "padding:8px 12px;flex-shrink:0";
   panel.append(bar, canvas, caption, status); ctx.root.append(panel);
@@ -63,15 +66,15 @@ export function init(ctx, data) {
       gl_Position = vec4(p.x*zoom/aspect, p.y*zoom, p.z*0.2, 1.0); }
   `));
   gl.attachShader(program, shader(gl.FRAGMENT_SHADER, `
-    precision mediump float; varying vec3 n;
+    precision mediump float; varying vec3 n; uniform float lines;
     void main() { vec3 normal = normalize(n); if (!gl_FrontFacing) normal = -normal;
       float light = 0.35 + 0.65*max(dot(normal, normalize(vec3(-0.4,0.7,-1.0))),0.0);
-      gl_FragColor = vec4(vec3(0.26,0.66,0.78)*light,1.0); }
+      gl_FragColor = vec4(mix(vec3(0.26,0.66,0.78)*light, vec3(0.1,0.3,0.4), lines),1.0); }
   `));
   gl.linkProgram(program);
   if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program)); gl.useProgram(program);
   const min = [Infinity,Infinity,Infinity], max = [-Infinity,-Infinity,-Infinity];
-  for (const p of data.vertices) for (let i=0;i<3;i++) { min[i]=Math.min(min[i],p[i]); max[i]=Math.max(max[i],p[i]); }
+  for (const p of [...data.vertices, ...(data.lines || []).flat()]) for (let i=0;i<3;i++) { min[i]=Math.min(min[i],p[i]); max[i]=Math.max(max[i],p[i]); }
   const center = min.map((v,i)=>(v+max[i])/2), scale = Math.max(...max.map((v,i)=>v-min[i])) || 1;
   const vertices = data.vertices.map(p=>p.map((v,i)=>(v-center[i])*2/scale)), positions = [], normals = [];
   for (const triangle of data.triangles) {
@@ -79,19 +82,31 @@ export function init(ctx, data) {
     const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
     for (const p of [a,b,c]) { positions.push(...p); normals.push(...n); }
   }
+  const triangleCount = positions.length / 3;
+  for (const line of data.lines || []) {
+    for (let i = 1; i < line.length; i++) {
+      for (const p of [line[i - 1], line[i]]) {
+        positions.push(...p.map((v, axis) => (v - center[axis]) * 2 / scale));
+        normals.push(0, 0, 1);
+      }
+    }
+  }
   for (const [name, values] of [["position",positions],["normal",normals]]) {
     gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(values),gl.STATIC_DRAW);
     const loc = gl.getAttribLocation(program,name); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc,3,gl.FLOAT,false,0,0);
   }
   let yaw=-0.65, pitch=0.6, zoom=0.7;
-  const uniforms=Object.fromEntries(["yaw","pitch","zoom","aspect"].map(k=>[k,gl.getUniformLocation(program,k)]));
+  const uniforms=Object.fromEntries(["yaw","pitch","zoom","aspect","lines"].map(k=>[k,gl.getUniformLocation(program,k)]));
   function draw() {
     const ratio=Math.min(window.devicePixelRatio||1,2);
     canvas.width=Math.max(1,Math.round(canvas.clientWidth*ratio)); canvas.height=Math.max(1,Math.round(canvas.clientHeight*ratio));
     gl.viewport(0,0,canvas.width,canvas.height); gl.clearColor(0.94,0.96,0.98,1); gl.enable(gl.DEPTH_TEST); gl.frontFace(gl.CW);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
     for (const [k,v] of Object.entries({yaw,pitch,zoom,aspect:canvas.width/canvas.height})) gl.uniform1f(uniforms[k],v);
-    gl.drawArrays(gl.TRIANGLES,0,positions.length/3);
+    gl.uniform1f(uniforms.lines, 0);
+    gl.drawArrays(gl.TRIANGLES,0,triangleCount);
+    gl.uniform1f(uniforms.lines, 1);
+    gl.drawArrays(gl.LINES,triangleCount,positions.length/3-triangleCount);
   }
   let pointer=null;
   canvas.onpointerdown=e=>{pointer=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);};

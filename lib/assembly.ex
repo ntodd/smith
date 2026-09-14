@@ -20,6 +20,10 @@ defmodule Smith.Assembly do
       iex> length(solids)
       2
 
+  <div class="smith-doc-preview" data-preview="api-assembly-0" data-model="assembly" data-label="Pair assembly">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   The evaluated compound contains installed manufactured parts, without
   fusing them. References and `installed: false` extras are available
   through `fetch/2` but excluded from that compound. All members must
@@ -220,6 +224,10 @@ defmodule Smith.Assembly do
       {:ok, {{10.0, 0.0, 0.0}, {12.0, 3.0, 4.0}}}
       iex> Smith.Assembly.fetch(assembly, :missing)
       {:error, :unknown_part}
+
+  <div class="smith-doc-preview" data-preview="api-assembly-1" data-model="foot" data-label="Fetched foot">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @type member_path :: atom() | String.t() | [atom() | String.t()]
   @spec fetch(Result.t(), member_path()) ::

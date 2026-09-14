@@ -52,8 +52,8 @@ serialized STL topology, 3MF contents, and Kino's optional dependency behavior.
 
 ## Interactive documentation previews
 
-`mix docs` evaluates marked examples and writes their meshes to the ignored
-`.doc-preview-assets/` directory. ExDoc includes those meshes and the shared Kino
+`mix docs` evaluates marked examples and writes browser snapshots to the ignored
+`.doc-preview-assets/` directory. ExDoc includes those snapshots and the shared Kino
 renderer in its output. Serve `doc/` over HTTP to try the previews locally; browser
 module loading does not work from a `file://` URL.
 
@@ -65,12 +65,24 @@ To add a preview, place this after a guide code block that defines `part`:
 </div>
 ```
 
-The name must be unique across the README and guides. The model attribute names
-a variable from the preceding Elixir blocks: a recipe, evaluated result, or
-successful result tuple. The builder evaluates those blocks in document order,
-skipping `Mix.install` because Mix already supplies the dependencies. Temporary
-exports are removed after the build. A failed example stops documentation generation.
+Add a preview after each example that constructs, changes, inspects, or exports
+geometry. When an example produces several variants, show each one. Setup code,
+numeric coordinate queries, and deliberate error examples need no preview.
+
+Names must be unique across the README, guides, and API docs. The model attribute
+names a variable from the preceding code: a recipe, evaluated result, successful
+result tuple, native shape, selection list, mesh, drawing, or SVG string.
+The builder evaluates Elixir blocks in document order, skipping `Mix.install`
+because Mix already supplies dependencies. In API docstrings, place the same marker
+after the indented IEx example. Each docstring has its own evaluation scope;
+ExUnit still checks its expected outputs as doctests.
+
+Surfaces use the shared Kino mesh payload. Wire-only results use sampled curves.
+Drawings show the SVG produced by `Smith.Drawing`, including hidden-line styling.
+For print-placement examples, read the exported STL back and preview that mesh.
+Temporary exports are removed after the build; removed examples lose their stale
+assets. Failed examples and empty geometric previews stop documentation generation.
 
 Preview frames load on demand. They use the same JavaScript as Livebook and
-contain a mesh snapshot, so editing and reevaluating a design still requires
+contain a geometry snapshot, so editing and reevaluating a design still requires
 Elixir. The fallback text or image remains visible in Markdown and without JavaScript.

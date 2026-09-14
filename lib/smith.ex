@@ -77,6 +77,10 @@ defmodule Smith do
       iex> OCEx.valid?(solid)
       {:ok, true}
 
+  <div class="smith-doc-preview" data-preview="api-smith-0" data-model="part" data-label="Filleted plate">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   ## Units and coordinates
 
   Dimensions are millimeters and modeling angles are degrees. Transforms
@@ -135,6 +139,10 @@ defmodule Smith do
       iex> {:ok, part} = Smith.evaluate(model)
       iex> OCEx.bounds(part.shape)
       {:ok, {{-10.0, -5.0, 6.0}, {10.0, 5.0, 10.0}}}
+
+  <div class="smith-doc-preview" data-preview="api-smith-1" data-model="part" data-label="Positioned box">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Primitives"
   @spec box(number(), number(), number(), [primitive_option()]) :: Model.t()
@@ -151,6 +159,10 @@ defmodule Smith do
       iex> {:ok, pin} = Smith.cylinder(2, 8, at: {10, 0, 3}) |> Smith.evaluate()
       iex> OCEx.bounds(pin.shape)
       {:ok, {{8.0, -2.0, 3.0}, {12.0, 2.0, 11.0}}}
+
+  <div class="smith-doc-preview" data-preview="api-smith-2" data-model="pin" data-label="Positioned cylinder">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Primitives"
   @spec cylinder(number(), number(), [primitive_option()]) :: Model.t()
@@ -210,6 +222,10 @@ defmodule Smith do
       iex> {:ok, bounds} = OCEx.bounds(part.shape)
       iex> bounds == {{8.0, 0.0, 0.0}, {10.0, 3.0, 4.0}}
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-3" data-model="part" data-label="Mirrored box">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec mirror(Model.t(), :xy | :xz | :yz | Smith.Plane.t()) :: Model.t()
@@ -257,6 +273,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(part.shape)
       iex> abs(volume - 48) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-4" data-model="part" data-label="Extruded section">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Profiles"
   @spec section(Model.t(), :xy | :xz | :yz | Smith.Plane.t()) :: Model.t()
@@ -397,6 +417,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(tube.shape)
       iex> abs(volume - 432 * :math.pi()) < 1.0e-5
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-5" data-model="tube" data-label="Thickened cylinder wall">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec thicken(Model.t() | Smith.Sketch.t(), number(), keyword()) :: Model.t()
@@ -480,6 +504,10 @@ defmodule Smith do
       iex> {:ok, face} = Smith.profile(outline) |> Smith.evaluate()
       iex> OCEx.area(face.shape)
       {:ok, 6.0}
+
+  <div class="smith-doc-preview" data-preview="api-smith-6" data-model="face" data-label="Triangular profile">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Profiles"
   @spec profile([Model.t()]) :: Model.t()
@@ -533,6 +561,10 @@ defmodule Smith do
       iex> {:ok, part} = Smith.evaluate(model)
       iex> OCEx.bounds(part.shape)
       {:ok, {{-2.0, -3.0, -2.0}, {2.0, 3.0, 0.0}}}
+
+  <div class="smith-doc-preview" data-preview="api-smith-7" data-model="part" data-label="Negative extrusion">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Profiles"
   @spec extrude(Smith.Sketch.t(), number()) :: Model.t()
@@ -623,6 +655,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(sleeve.shape)
       iex> abs(volume - :math.pi() * (6 * 6 - 4 * 4) * 10) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-8" data-model="sleeve" data-label="Revolved sleeve">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Profiles"
   @spec revolve(Smith.Sketch.t() | Model.t(), OCEx.point3(), number(), OCEx.point3()) :: Model.t()
@@ -654,6 +690,10 @@ defmodule Smith do
       iex> {:ok, solids} = OCEx.solids(transition.shape)
       iex> length(solids)
       1
+
+  <div class="smith-doc-preview" data-preview="api-smith-9" data-model="transition" data-label="Ruled loft">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Profiles"
   @spec loft([Smith.Sketch.t()], keyword()) :: Model.t()
@@ -677,6 +717,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(rod.shape)
       iex> abs(volume - 40 * :math.pi()) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-10" data-model="rod" data-label="Swept rod">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec sweep(Smith.Sketch.t(), Smith.Path.t(), keyword()) :: Model.t()
@@ -703,6 +747,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(tray.shape)
       iex> abs(volume - 1664) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-11" data-model="tray" data-label="Shelled tray">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec shell(Model.t(), keyword()) :: Model.t()
@@ -807,6 +855,10 @@ defmodule Smith do
       iex> {:ok, solids} = OCEx.solids(part.shape)
       iex> length(solids)
       1
+
+  <div class="smith-doc-preview" data-preview="api-smith-12" data-model="part" data-label="Fused boss">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec fuse(Model.t(), Model.t() | [Model.t()]) :: Model.t()
@@ -859,6 +911,10 @@ defmodule Smith do
       iex> {:ok, volume} = OCEx.volume(part.shape)
       iex> abs(volume - 792.0) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-smith-13" data-model="part" data-label="Chamfered block">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec chamfer(Model.t(), keyword()) :: Model.t()
@@ -939,6 +995,10 @@ defmodule Smith do
       iex> {:ok, part} = Smith.evaluate(model)
       iex> OCEx.distance_to_point(part.shape, {5, 5, 2})
       {:ok, 1.0}
+
+  <div class="smith-doc-preview" data-preview="api-smith-15" data-model="part" data-label="Through hole">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @doc group: "Modeling"
   @spec hole(Model.t(), keyword()) :: Model.t()

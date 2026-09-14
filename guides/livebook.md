@@ -90,6 +90,10 @@ finished
 |> Smith.Kino.render(label: "Finished plate")
 ```
 
+<div class="smith-doc-preview" data-preview="livebook-4-finished" data-model="finished" data-label="Piped evaluation">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Passing an existing result avoids reevaluating the recipe. Preview failures raise
 `RuntimeError` with the reason, including the operation and step for modeling
 failures. A piped `{:error, reason}` raises the same error. Match on
@@ -117,6 +121,10 @@ To generate printable files, export the evaluated result:
 {:ok, files} = Smith.export(result, "output", name: "plate", on_bed: true)
 files
 ```
+
+<div class="smith-doc-preview" data-preview="livebook-5-result" data-model="result" data-label="Exported plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 PNG is an illustration, not a fabrication file. Export produces verified STL and
 3MF geometry plus STEP and reports; see [exporting](exporting.md). Files are written

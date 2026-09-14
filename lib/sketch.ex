@@ -12,6 +12,10 @@ defmodule Smith.Sketch do
       iex> OCEx.shape_type(face.shape)
       {:ok, :face}
 
+  <div class="smith-doc-preview" data-preview="api-sketch-0" data-model="face" data-label="Sketch cutout">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+
   Use `Smith.extrude/2`, `Smith.revolve/4`, `Smith.loft/2`, or
   `Smith.sweep/3` to build solid model recipes. A bare sketch evaluates to one face and cannot be
   exported as a printable bundle.
@@ -58,6 +62,10 @@ defmodule Smith.Sketch do
       iex> {:ok, face} = Smith.evaluate(sketch)
       iex> OCEx.bounds(face.shape)
       {:ok, {{10.0, 14.0, 0.0}, {14.0, 20.0, 0.0}}}
+
+  <div class="smith-doc-preview" data-preview="api-sketch-1" data-model="face" data-label="Aligned rectangle">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec rectangle(number(), number(), keyword()) :: t()
   def rectangle(width, height, opts \\ []),
@@ -138,6 +146,10 @@ defmodule Smith.Sketch do
       iex> {:ok, area} = OCEx.area(face.shape)
       iex> abs(area - 2 * :math.pi()) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-sketch-2" data-model="face" data-label="Semicircle profile">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec profile([tuple()], keyword()) :: t()
   def profile(edges, opts \\ []), do: %__MODULE__{kind: :profile, data: edges, options: opts}
@@ -198,6 +210,10 @@ defmodule Smith.Sketch do
       iex> {:ok, {x, y, z}} = OCEx.center_of_mass(part.shape)
       iex> abs(x - 11) < 1.0e-6 and abs(y) < 1.0e-6 and abs(z) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-sketch-3" data-model="part" data-label="Side extrusion">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec on(t(), Plane.t()) :: t()
   def on(%__MODULE__{} = sketch, plane), do: %{sketch | plane: plane}
@@ -239,6 +255,10 @@ defmodule Smith.Sketch do
       iex> {:ok, volume} = OCEx.volume(part.shape)
       iex> abs(volume - 32 * :math.pi()) < 1.0e-6
       true
+
+  <div class="smith-doc-preview" data-preview="api-sketch-4" data-model="part" data-label="Extruded ring">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec cut(t(), t() | [t()]) :: t()
   def cut(%__MODULE__{} = sketch, tools) when is_list(tools),

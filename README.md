@@ -33,7 +33,9 @@ Run `elixir mount.exs`. The output bundle includes STEP, BREP, binary STL, and 3
 
 In an existing Mix project, add `{:smith, "~> 0.1.0"}` to `deps/0`. Smith requires Elixir 1.18+ and a supported native installation; see the installation guide for the tested OS/OTP combinations. No display server is required to model, mesh, or export.
 
-## Functions first
+The [HexDocs version of this README](https://hexdocs.pm/smith/readme.html) includes interactive previews below the examples. Drag to rotate, scroll to zoom, or open a preview fullscreen. GitHub shows still images.
+
+## Modeling with functions
 
 Recipes are immutable values. Construction makes no native calls; `Smith.evaluate/1` builds the geometry. Reuse a sketch or body in multiple variants, name features with functions, and use ordinary comprehensions for repeated features:
 
@@ -48,11 +50,19 @@ plate =
 side_plate = plate |> Smith.rotate({1, 0, 0}, 90) |> Smith.translate({0, 30, 0})
 ```
 
+<div class="smith-doc-preview" data-preview="readme-1-plate" data-model="plate" data-label="Plate">
+<p><img src="guides/images/readme-1-plate.png" alt="Plate with four mounting holes"></p>
+</div>
+
+<div class="smith-doc-preview" data-preview="readme-1-side-plate" data-model="side_plate" data-label="Rotated plate">
+<p><img src="guides/images/readme-1-side-plate.png" alt="Rotated side plate"></p>
+</div>
+
 Distances are millimeters. Model transformations use world coordinates; sketch coordinates live in an explicit local plane. Shapes retain analytic surfaces until meshing. A recipe is your editable design; an evaluated BREP hash identifies its geometry, not its feature history.
 
 Boxes, cylinders, cones, spheres, and tori accept `at: {x, y, z}` and per-axis alignment. For example, `Smith.box(40, 20, 4, align: {:center, :center, :min})` centers the footprint with its bottom at Z=0. See [primitive placement](guides/modeling.md).
 
-## Parts that belong together
+## Assemblies
 
 ```elixir
 alias Smith.Assembly
@@ -68,9 +78,13 @@ assembly =
 IO.puts(files.print_pack)
 ```
 
+<div class="smith-doc-preview" data-preview="readme-2-result" data-model="result" data-label="Bracket assembly">
+<p><img src="guides/images/readme-2-result.png" alt="Bracket assembly"></p>
+</div>
+
 Named parts have installed, print, and display placement. Reuse groups with `Assembly.subassembly/4` and retrieve a descendant with a path such as `Assembly.fetch(result, [:left, :base])`. References stay out of printable files. A complete assembly export contains separate part bundles, assembly STEP, reference STEP, and a ZIP of printable STL/3MF pairs. The current manifest is updated after the part mesh checks and STEP round trips pass. See [exporting](guides/exporting.md) for the exact checks and their limits.
 
-## Explore builds in Livebook
+## Livebook
 
 The [Livebook guide](guides/livebook.md) shows each construction stage in its own rotatable preview and lets you download PNG images. Kino is optional: add it to the notebook's dependencies to enable `Smith.Kino`. Modeling and export remain independent of the notebook.
 
@@ -78,7 +92,7 @@ The [drawing Livebook](https://github.com/ntodd/smith/blob/main/examples/drawing
 builds a counterbored plate, compares top/front/oblique views, and exports SVG/DXF
 alongside printable geometry.
 
-## Learn the library
+## Guides
 
 - [Getting started](guides/getting-started.md): scripts, projects, parameters, and the first export.
 - [Modeling](guides/modeling.md): primitives, composition, transformations, selectors, and finishing.

@@ -119,6 +119,18 @@ pair = Assembly.new(:pair)
 4 = Enum.count(members, & &1.installed)
 ```
 
+<div class="smith-doc-preview" data-preview="assemblies-3-assembled" data-model="assembled" data-label="Nested assembly">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="assemblies-3-right" data-model="right" data-label="Right subassembly">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="assemblies-3-spacer" data-model="spacer" data-label="Fetched spacer">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Paths can also be strings: `"right/spacer"`. Empty paths, unknown names,
 and descent through a leaf return `:unknown_part`. Fetching a branch keeps
 its descendants in final world coordinates. `members/1` returns all leaves

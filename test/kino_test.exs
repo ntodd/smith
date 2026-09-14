@@ -60,4 +60,22 @@ defmodule Smith.KinoTest do
       Smith.Kino.render({:error, :unknown_part})
     end
   end
+
+  test "curve previews contain sampled paths instead of an empty surface" do
+    path = Smith.Path.new([Smith.line({0, 0, 0}, {0, 0, 10})])
+    assert %Kino.JS{} = Smith.Kino.render(path)
+    {:ok, result} = Smith.evaluate(path)
+    assert {:ok, data} = Smith.Kino.Data.build(result, [])
+    assert data.triangles == []
+    assert data.lines == [[[0.0, 0.0, 0.0], [0.0, 0.0, 10.0]]]
+    assert data.revision == result.revision
+  end
+
+  test "surface previews retain triangles without adding tessellation edges" do
+    {:ok, result} = Smith.evaluate(Smith.Sketch.circle(4))
+    assert {:ok, data} = Smith.Kino.Data.build(result, [])
+    assert data.triangles != []
+    assert data.lines == []
+    assert {:error, :invalid_argument} = Smith.Kino.Data.build(result, tolerance: 1.0e-9)
+  end
 end

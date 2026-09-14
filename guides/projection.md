@@ -18,6 +18,18 @@ outline = Smith.project(source, target, direction: {0, 0, -1})
 {:ok, [_wire]} = OCEx.wires(projected.shape)
 ```
 
+<div class="smith-doc-preview" data-preview="projection-0-source" data-model="source" data-label="Source circle">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="projection-0-target" data-model="target" data-label="Inclined target">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="projection-0-projected" data-model="projected" data-label="Projected ellipse">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The source circle lies above the target plane `z = -x`. Its projection is an
 ellipse on that plane. The direction is normalized, so its magnitude does not
 set a travel distance. Parallel projection is bidirectional: changing `{0,0,-1}`
@@ -37,6 +49,14 @@ part = profile |> Smith.extrude({0, 0, 3})
 true = abs(volume - 48 * :math.pi()) < 1.0e-6
 ```
 
+<div class="smith-doc-preview" data-preview="projection-1-face-result" data-model="face_result" data-label="Filled ellipse">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="projection-1-result" data-model="result" data-label="Extruded projection">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 `face/1` accepts one closed planar wire. It preserves world placement and returns
 a face recipe that composes with extrusion, revolution, and Boolean operations.
 It does not guess which projected boundaries are holes or pick one of several
@@ -53,6 +73,10 @@ enlarged = Sketch.circle(2, on: Plane.xy(z: 5))
 {:ok, area} = OCEx.area(enlarged_result.shape)
 true = abs(area - 16 * :math.pi()) < 1.0e-6
 ```
+
+<div class="smith-doc-preview" data-preview="projection-2-enlarged-result" data-model="enlarged_result" data-label="Conical projection">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 This conical projection follows half-rays from the point through the source.
 The target is twice as far from the point as the source plane, so the radius
@@ -73,6 +97,14 @@ top_outline = Smith.project(source, top, direction: {0, 0, -1})
 {:ok, [_wire]} = OCEx.wires(top_result.shape)
 ```
 
+<div class="smith-doc-preview" data-preview="projection-3-top" data-model="top" data-label="Selected target face">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="projection-3-top-result" data-model="top_result" data-label="Projected top outline">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Projecting onto the whole box instead would retain both the top and bottom hits.
 Projection does not sort intersections by distance or choose a visible surface.
 Selecting target faces first makes that choice explicit. Native targets may be
@@ -91,6 +123,14 @@ curves = Smith.line({-3, -10, 5}, {3, -10, 5})
 true = abs(length - 20 * :math.asin(3 / 5)) < 1.0e-5
 ```
 
+<div class="smith-doc-preview" data-preview="projection-4-wall" data-model="wall" data-label="Cylindrical target">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="projection-4-curves-result" data-model="curves_result" data-label="Projected arcs">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The line produces an arc on each side of the cylinder. Inspect them with
 `Smith.edges/2`, `Smith.inspect_edges/2`, or `OCEx.edge_sample/2`. The projected
 curves remain exact native geometry; this operation does not use a mesh.
@@ -106,9 +146,8 @@ Avoid coincident or tangent configurations when a unique projected curve is need
 
 ## Preview and export
 
-Kino currently renders triangle surfaces. Preview the source sketch, target
-surface, filled planar face, and final solid; inspect wire-only results with
-curve queries. Wires can be exported as BREP/STEP through OCEx, but printable
+Kino renders faces and solids as triangle surfaces, and wire-only results as
+sampled curves. Preview each stage or inspect exact geometry with curve queries. Wires can be exported as BREP/STEP through OCEx, but printable
 STL/3MF require solid geometry.
 
 ```elixir
@@ -116,6 +155,10 @@ STL/3MF require solid geometry.
   angular_tolerance: 0.1)
 true = files.verification.mesh.watertight
 ```
+
+<div class="smith-doc-preview" data-preview="projection-5-result" data-model="result" data-label="Exported projected cap">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 The [projection Livebook](https://github.com/ntodd/smith/blob/main/examples/projection.livemd)
 shows these stages and exports a two-part print pack. Orthographic drawings and

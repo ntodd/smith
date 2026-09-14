@@ -215,6 +215,10 @@ defmodule Smith.Export do
       iex> {:ok, print} = Smith.Export.mesh(box)
       iex> {print.checks.watertight, print.checks.components, byte_size(print.stl)}
       {true, 1, 684}
+
+  <div class="smith-doc-preview" data-preview="api-export-0" data-model="box" data-label="Printable box">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
   """
   @spec mesh(OCEx.Shape.t(), number(), number()) :: {:ok, map()} | {:error, term()}
   def mesh(shape, tolerance \\ 0.03, angular_tolerance \\ 0.5) do

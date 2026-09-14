@@ -2,7 +2,8 @@
 
 ## Unreleased
 
-- Embed the shared 3D renderer in HexDocs, with meshes generated from the documented examples.
+- Render geometry examples throughout the README, guides, and API docs from their accompanying code. Include SVG drawing outputs and still images for GitHub.
+- Display sampled paths and edge-only geometry in the shared Kino renderer.
 
 ## 0.1.0
 

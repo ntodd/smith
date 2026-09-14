@@ -16,6 +16,10 @@ blank = Smith.box(40, 30, 18)
 {:ok, opening_info} = OCEx.face_info(opening)
 ```
 
+<div class="smith-doc-preview" data-preview="paths-and-shells-0-opening" data-model="opening" data-label="Selected top face">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 `facing(:z)` selects outward +Z planar faces. `facing({:z, :negative})` selects outward −Z faces. `parallel(:z)` ignores sign: it selects straight edges along Z, or planar faces with normals along Z. It does not mean the face itself lies parallel to Z.
 
 `at_max(:z)` and `at_min(:z)` compare face area centroids or edge parameter midpoints, not bounding-box corners. They keep all ties within 1.0e-7 mm. A query returns an empty list when no geometry matches; it never chooses an arbitrary face from a tie.
@@ -34,6 +38,10 @@ tray = blank |> Smith.shell(openings: top, thickness: -2, count: 1)
 {:ok, volume} = OCEx.volume(hollow.shape)
 true = abs(volume - (40 * 30 * 18 - 36 * 26 * 16)) < 1.0e-6
 ```
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-1-hollow" data-model="hollow" data-label="Shelled tray">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 The floor is also 2 mm thick. Negative thickness retains the exterior dimensions; positive thickness builds outside the source surfaces. `join: :arc` is the default and rounds gaps between offset surfaces. `join: :intersection` extends adjacent surfaces to their intersection.
 
@@ -54,6 +62,10 @@ longer = Path.append(straight, Smith.line({0, 0, 20}, {0, 0, 30}))
 {:ok, 30.0} = OCEx.length(wire.shape)
 ```
 
+<div class="smith-doc-preview" data-preview="paths-and-shells-2-wire" data-model="wire" data-label="Extended path">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 Use `Smith.line/2`, `Smith.arc/6`, and `Smith.spline/2` for its edges. Consecutive directed endpoints must agree within 1.0e-7 mm. Smith does not reverse edges or sort them into a path. Empty, disconnected, and closed paths fail during evaluation. A path is a wire; it has no printable volume on its own.
 
 ## Sweep a placed profile
@@ -67,6 +79,10 @@ rod = Sketch.circle(2) |> Smith.sweep(straight)
 true = abs(rod_volume - :math.pi() * 4 * 20) < 1.0e-6
 ```
 
+<div class="smith-doc-preview" data-preview="paths-and-shells-3-rod-result" data-model="rod_result" data-label="Straight sweep">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 For a quarter circle in XY, the path starts at `{20, 0, 0}` and points along +Y. An XZ sketch is perpendicular to that tangent. Its local `at:` places the section center at the path start:
 
 ```elixir
@@ -76,6 +92,14 @@ bend = Sketch.circle(2, on: Plane.xz(), at: {20, 0}) |> Smith.sweep(bend_path)
 {:ok, bend_volume} = OCEx.volume(bend_result.shape)
 true = abs(bend_volume - 40 * :math.pi() * :math.pi()) < 1.0e-5
 ```
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-4-bend-path" data-model="bend_path" data-label="Arc path">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-4-bend-result" data-model="bend_result" data-label="Curved sweep">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 The profile must have one closed boundary. Cutouts that create holes return `:sweep_profile_has_holes`. A profile in the wrong plane returns `:misaligned_profile`. The first version deliberately keeps placement explicit rather than guessing how an arbitrary profile should attach.
 
@@ -98,6 +122,14 @@ smooth = Smith.loft(sections, ruled: false)
 {:ok, smooth_result} = Smith.evaluate(smooth)
 ```
 
+<div class="smith-doc-preview" data-preview="paths-and-shells-5-ruled" data-model="ruled" data-label="Ruled loft">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-5-smooth" data-model="smooth" data-label="Smooth loft">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The default remains `ruled: true`, so existing recipes retain their geometry. Both modes require at least two sections with one closed boundary each. Section order controls traversal; OCCT chooses correspondence between their edges. Smooth interpolation can overshoot between sections. There are no seam controls, guide rails, or guaranteed continuity at caps.
 
 ## Draw a local spline
@@ -112,6 +144,14 @@ arched = Sketch.profile([
 arched_part = arched |> Smith.extrude(3)
 ```
 
+<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched" data-model="arched" data-label="Spline profile">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched-part" data-model="arched_part" data-label="Extruded spline">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The optional tangent pair specifies endpoint directions, not derivative magnitudes. Sketch placement rotates these directions with the plane and translates the interpolation points. This is distinct from `Smith.spline/2`, whose points and tangent vectors use world coordinates and whose result is an edge recipe suitable for a path.
 
 ## Preview and export
@@ -123,5 +163,9 @@ With Kino installed, `Smith.Kino.render(tray)` directly returns a preview you ca
 true = files.verification.mesh.watertight
 true = files.verification.mesh.winding_consistent
 ```
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-7-hollow" data-model="hollow" data-label="Exported tray">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 The verified bundle contains STEP, BREP, STL, and 3MF files. Its checks cover mesh connectivity, winding, and STEP volume agreement. Printer settings, supports, strength, and fit remain design decisions; see [exporting](exporting.md).

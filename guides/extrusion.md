@@ -16,6 +16,10 @@ centered = Smith.extrude(outline, 5, both: true)
 {:ok, {{-10.0, -8.0, -5.0}, {10.0, 8.0, 5.0}}} = OCEx.bounds(result.shape)
 ```
 
+<div class="smith-doc-preview" data-preview="extrusion-0-centered" data-model="centered" data-label="Symmetric extrusion">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 `both: true` applies the supplied distance on **each** side: 5 mm makes a total
 depth of 10 mm. It does not split a total depth in half. The original sketch plane
 stays at the center. Reversing the distance produces the same symmetric extent.
@@ -31,6 +35,10 @@ expected = 320 * 10 - 36 * slope * 100 + 4 * slope * slope * 1000 / 3
 {:ok, volume} = OCEx.volume(result.shape)
 true = abs(volume - expected) < 1.0e-5
 ```
+
+<div class="smith-doc-preview" data-preview="extrusion-1-tapered" data-model="tapered" data-label="Tapered extrusion">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Taper angles are degrees, strictly between −90 and 90. A positive angle removes
 material away from the sketch plane; a negative angle adds material. The starting
@@ -48,6 +56,10 @@ ring = Sketch.circle(10)
   |> Smith.extrude(5, both: true, taper: 4)
 {:ok, ring_result} = Smith.evaluate(ring)
 ```
+
+<div class="smith-doc-preview" data-preview="extrusion-2-ring" data-model="ring" data-label="Symmetric tapered ring">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Nonzero taper requires extrusion perpendicular to the profile plane. Straight and
 circular boundaries produce supported planar and cylindrical prism walls, including
@@ -67,6 +79,10 @@ sloped = Sketch.rectangle(10, 6, align: {:min, :min})
 true = abs(volume - 390) < 1.0e-6
 ```
 
+<div class="smith-doc-preview" data-preview="extrusion-3-sloped" data-model="sloped" data-label="Extrusion to an inclined plane">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 The target above is `z = 4 + x/2`. Its height runs from 4 to 9 mm across the
 rectangle, giving an average height of 6.5 mm and a volume of 390 mm³.
 The target is an infinite plane; its X direction defines its local frame but does
@@ -81,6 +97,10 @@ backward = Sketch.circle(3)
   |> Smith.extrude_until(Plane.xy(z: -8), direction: {0, 0, -1})
 {:ok, backward_result} = Smith.evaluate(backward)
 ```
+
+<div class="smith-doc-preview" data-preview="extrusion-4-backward" data-model="backward" data-label="Backward extrusion">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 Every point of the profile must reach the target in the positive travel direction,
 more than 1.0e-7 mm away. A target touching or crossing the initial profile returns
@@ -99,6 +119,10 @@ Kino previews, and verified export work as usual.
   angular_tolerance: 0.1)
 true = files.verification.mesh.watertight
 ```
+
+<div class="smith-doc-preview" data-preview="extrusion-5-ring-result" data-model="ring_result" data-label="Exported ring">
+<p>Interactive preview available in HexDocs.</p>
+</div>
 
 The [extrusion Livebook](https://github.com/ntodd/smith/blob/main/examples/extrusion.livemd)
 shows these stages, checks analytic volumes, and exports three parts as a print pack.
