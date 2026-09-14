@@ -1,4 +1,17 @@
 function mountPreviews() {
+  // Livebook hides these comments; ExDoc uses them to show the same build stages.
+  const comments = document.createTreeWalker(document.body, NodeFilter.SHOW_COMMENT);
+  const markers = [];
+  while (comments.nextNode()) {
+    if (comments.currentNode.nodeValue.trim().startsWith('<div class="smith-doc-preview"')) {
+      markers.push(comments.currentNode);
+    }
+  }
+  for (const marker of markers) {
+    const template = document.createElement('template');
+    template.innerHTML = marker.nodeValue.trim();
+    marker.replaceWith(template.content);
+  }
   for (const element of document.querySelectorAll('.smith-doc-preview[data-preview]')) {
     if (element.querySelector('iframe')) continue;
     const frame = document.createElement('iframe');

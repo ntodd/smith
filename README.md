@@ -35,6 +35,16 @@ In an existing Mix project, add `{:smith, "~> 0.1.0"}` to `deps/0`. Smith requir
 
 The [HexDocs version of this README](https://hexdocs.pm/smith/readme.html) includes interactive previews below the examples. Drag to rotate, scroll to zoom, or open a preview fullscreen. GitHub shows still images.
 
+## Build a Raspberry Pi enclosure
+
+[Follow the complete modeling walkthrough](examples/raspberry-pi-enclosure.livemd):
+a sliding board tray, quarter-turn latch, curved cooling duct, and replaceable grilles.
+Each stage has a rotatable preview. The lesson covers reference geometry, sketches,
+lofts, shelling, nested assemblies, joints, clearance checks, and verified print files.
+It also includes rail coupons to test before printing the enclosure.
+
+[![Raspberry Pi enclosure with the service tray open](guides/images/pi-enclosure.png)](examples/raspberry-pi-enclosure.livemd)
+
 ## Modeling with functions
 
 Recipes are immutable values. Construction makes no native calls; `Smith.evaluate/1` builds the geometry. Reuse a sketch or body in multiple variants, name features with functions, and use ordinary comprehensions for repeated features:

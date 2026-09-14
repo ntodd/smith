@@ -18,7 +18,8 @@ defmodule Smith.DocPreviewsTest do
     root = Path.expand("..", __DIR__)
 
     sources = [
-      Path.join(root, "README.md") | Path.wildcard(Path.join(root, "{guides,lib}/**/*.{md,ex}"))
+      Path.join(root, "README.md")
+      | Path.wildcard(Path.join(root, "{guides,lib,examples}/**/*.{md,ex,livemd}"))
     ]
 
     names =
