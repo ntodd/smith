@@ -232,7 +232,9 @@ defmodule Smith.Assembly.Joint do
   end
 
   defp coordinates(:ball, %{angles: {x, y, z}})
-       when is_number(x) and is_number(y) and is_number(z), do: {:ok, %{x: x, y: y, z: z}}
+       when is_number(x) and is_number(y) and is_number(z) do
+    {:ok, %{x: x, y: y, z: z}}
+  end
 
   defp coordinates(:ball, _), do: {:error, :invalid_options}
 
