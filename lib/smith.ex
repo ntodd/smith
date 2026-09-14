@@ -1242,7 +1242,8 @@ defmodule Smith do
          {:ok, selected} <- Smith.Selector.select(body, :faces, opts[:openings]),
          :ok <- nonempty(selected),
          :ok <- selection_count(selected, opts[:count]),
-         {:ok, shape} <- OCEx.shell(body, selected, opts[:thickness], Keyword.take(opts, [:join])),
+         native_opts = Keyword.take(opts, [:join]),
+         {:ok, shape} <- OCEx.shell(body, selected, opts[:thickness], native_opts),
          do: single_solid(shape)
   end
 
