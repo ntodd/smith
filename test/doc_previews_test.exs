@@ -2,6 +2,8 @@ defmodule Smith.DocPreviewsTest do
   use ExUnit.Case, async: false
   @moduletag :tmp_dir
 
+  # This integration test builds and checks meshes for every documentation example.
+  @tag timeout: 120_000
   test "documentation previews mesh the documented stages and assembly poses", %{tmp_dir: output} do
     script = Path.expand("../scripts/build-doc-previews.exs", __DIR__)
     Code.eval_string(File.read!(script), [output: output], file: script)
@@ -18,7 +20,8 @@ defmodule Smith.DocPreviewsTest do
     root = Path.expand("..", __DIR__)
 
     sources = [
-      Path.join(root, "README.md") | Path.wildcard(Path.join(root, "{guides,lib}/**/*.{md,ex}"))
+      Path.join(root, "README.md")
+      | Path.wildcard(Path.join(root, "{guides,lib,examples}/**/*.{md,ex,livemd}"))
     ]
 
     names =
@@ -39,6 +42,7 @@ defmodule Smith.DocPreviewsTest do
         assert preview["svg"] =~ "viewBox="
       else
         vertices = preview["vertices"]
+        vertex_count = length(vertices)
         assert preview["triangles"] != [] or preview["lines"] != []
 
         for point <- vertices ++ Enum.flat_map(preview["lines"], & &1),
@@ -47,7 +51,7 @@ defmodule Smith.DocPreviewsTest do
 
         for triangle <- preview["triangles"] do
           assert length(triangle) == 3
-          assert Enum.all?(triangle, &(is_integer(&1) and &1 >= 0 and &1 < length(vertices)))
+          assert Enum.all?(triangle, &(is_integer(&1) and &1 >= 0 and &1 < vertex_count))
         end
       end
     end

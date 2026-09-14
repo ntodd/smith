@@ -2,7 +2,10 @@
 defmodule Smith.DocPreviews do
   def sources(root) do
     guides =
-      for path <- [Path.join(root, "README.md") | Path.wildcard(Path.join(root, "guides/*.md"))],
+      for path <- [
+            Path.join(root, "README.md")
+            | Path.wildcard(Path.join(root, "{guides,examples}/*.{md,livemd}"))
+          ],
           do: {path, File.read!(path)}
 
     api =

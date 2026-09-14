@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a Raspberry Pi enclosure Livebook covering reference geometry, a sliding tray, cam latch, cooling duct, clearance checks, and printable exports, with interactive previews in HexDocs.
+
 - Render geometry examples throughout the README, guides, and API docs from their accompanying code. Include SVG drawing outputs and still images for GitHub.
 - Display sampled paths and edge-only geometry in the shared Kino renderer.
 

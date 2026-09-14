@@ -48,6 +48,7 @@ defmodule Smith.MixProject do
           "guides/joints.md",
           "guides/exporting.md",
           "guides/livebook.md",
+          "examples/raspberry-pi-enclosure.livemd",
           "guides/errors-and-limits.md",
           "CHANGELOG.md",
           "LICENSE"

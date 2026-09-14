@@ -130,6 +130,15 @@ PNG is an illustration, not a fabrication file. Export produces verified STL and
 3MF geometry plus STEP and reports; see [exporting](exporting.md). Files are written
 on the machine running the notebook's Elixir runtime.
 
+## Raspberry Pi enclosure walkthrough
+
+[Design a Raspberry Pi enclosure](../examples/raspberry-pi-enclosure.livemd)
+builds a complete mechanical assembly from reference geometry through printable
+exports. Follow the sliding tray, rotating latch, and curved duct through their
+construction stages, then inspect the installed and exploded poses. The notebook
+includes interference checks, drawings, and a rail fit test. It assumes Smith is
+installed and concentrates on modeling decisions.
+
 ## Runnable notebooks
 
 Download or open these from the repository in Livebook:
