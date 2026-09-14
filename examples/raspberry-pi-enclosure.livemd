@@ -881,7 +881,7 @@ Start with the rail coupon and a screw-pilot test in the intended material. Chec
 | 4 screws | M3 × 8 mm, countersunk | Lid to chassis; verify head profile and pilot fit |
 | 4 screws and nuts | M2 × 10 mm | Top grille, duct flange, and lid |
 | 2 screws and nuts | M2 × 8 mm | Rear grille |
-| 1 screw and washer | M2 × 25 mm | Cam retention from below the tray; adjust length/washer stack for free rotation |
+| 1 screw and washer | M2 × 30 mm | Cam retention from below the tray; adjust length/washer stack for free rotation |
 | 4 feet | Printed TPU or suitably sized rubber | Grip and separation from the desk |
 
 Fit the board with the Active Cooler already installed. Check screw engagement without letting tips reach the PCB. Fit the cam and its retaining screw, then confirm it rotates freely. Slide in the tray, fit the rear grille and lid assembly, and turn the cam into the keeper. Unplug cables before withdrawing the tray.
@@ -893,6 +893,4 @@ Check that every plug seats fully, the microSD card is accessible, the fan turns
 - Change the grille slant from 65° to 115°. Its interface stays fixed; inspect both variants before choosing one.
 - Change a duct station's center or size, then rerun the lid-clearance and hardware checks. Watch how a local profile change affects another part.
 - Make a thinner rail coupon by shortening only its intersection tool. The mating profile should remain identical.
-- Move a mounting hole and use the failing fit checks to trace the dependent dimensions. A parameterized model still needs a deliberate datum strategy.
-
-
+- Increase the cooler envelope height until the cover check fails. Find the interfering part, then decide whether to raise the lid or change the duct.
