@@ -132,7 +132,7 @@ on the machine running the notebook's Elixir runtime.
 
 ## Raspberry Pi enclosure walkthrough
 
-[Design a serviceable Raspberry Pi enclosure](../examples/raspberry-pi-enclosure.livemd)
+[Design a Raspberry Pi enclosure](../examples/raspberry-pi-enclosure.livemd)
 builds a complete mechanical assembly from reference geometry through printable
 exports. Follow the sliding tray, rotating latch, and curved duct through their
 construction stages, then inspect the installed and exploded poses. The notebook

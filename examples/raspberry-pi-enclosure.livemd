@@ -1,4 +1,4 @@
-# Design a serviceable Raspberry Pi enclosure
+# Design a Raspberry Pi enclosure
 
 ```elixir
 Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
@@ -22,15 +22,15 @@ Put the PCB's lower-left corner at X=0, Y=0, viewed from above. X runs along the
 
 Use the [official board drawing](https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-mechanical-drawing.pdf) for the outline, mounting pattern, and connector centers. The [Active Cooler drawing](https://datasheets.raspberrypi.com/cooling/raspberry-pi-active-cooler-mechanical-drawing.pdf) gives a 63.5 × 42.5 × 13.7 mm overall envelope. Both drawings describe approximate reference dimensions.
 
-| Dimension | Value | Basis |
-| --- | --- | --- |
-| PCB outline | 85 × 56 mm | Board drawing |
-| Mounting pattern | 58 × 49 mm; first center at 3.5, 3.5 | Board drawing |
-| End connector centers, Y | 10.2, 29.1, 47 mm | Board drawing |
-| Side connector centers, X | 11.2, 25.8, 39.2 mm | Board drawing |
-| PCB thickness | 1.6 mm | Design assumption; verify |
-| Connector housing sizes and cooler placement | Simplified below | Conservative design references; verify |
-| Sliding clearance | 0.4 mm per running surface | Initial printing allowance; test coupon first |
+| Dimension                                    | Value                                 | Basis                                         |
+| -------------------------------------------- | ------------------------------------- | --------------------------------------------- |
+| PCB outline                                  | 85 × 56 mm                           | Board drawing                                 |
+| Mounting pattern                             | 58 × 49 mm; first center at 3.5, 3.5 | Board drawing                                 |
+| End connector centers, Y                     | 10.2, 29.1, 47 mm                     | Board drawing                                 |
+| Side connector centers, X                    | 11.2, 25.8, 39.2 mm                   | Board drawing                                 |
+| PCB thickness                                | 1.6 mm                                | Design assumption; verify                     |
+| Connector housing sizes and cooler placement | Simplified below                      | Conservative design references; verify        |
+| Sliding clearance                            | 0.4 mm per running surface            | Initial printing allowance; test coupon first |
 
 Keep dimensions distinct from numerical tolerance. A 0.4 mm mechanical gap is real space in the design. Mesh deflection only controls how the surface is approximated by triangles.
 
@@ -61,9 +61,7 @@ pcb =
 Smith.Kino.render(pcb, label: "PCB outline and mounting holes")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-1-pcb" data-model="pcb" data-label="PCB outline and mounting holes"></div> -->
-
-## 2. Model what the enclosure must avoid
+## 2. Model the reference geometry
 
 Reference geometry needs enough detail to expose interference. It does not need every resistor. The sockets below have open fronts, so the preview also makes the board's orientation easy to recognize. Their dimensions are deliberately kept in a short table that can be corrected after measurement.
 
@@ -111,8 +109,6 @@ hardware = Smith.compound([board, cooler])
 
 Smith.Kino.render(hardware, label: "Board and cooler references")
 ```
-
-<!-- <div class="smith-doc-preview" data-preview="pi-2-hardware" data-model="hardware" data-label="Board and cooler references"></div> -->
 
 ## 3. Hollow the chassis
 
@@ -187,8 +183,6 @@ body =
 Smith.Kino.render(body, label: "Rails and four lid mounts")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-4-body" data-model="body" data-label="Rails and four lid mounts"></div> -->
-
 ## 5. Cut service openings
 
 A shared side opening gives USB-C and both micro-HDMI plugs room for their molded shoulders. Three tight holes around metal sockets would not necessarily let cables seat fully.
@@ -238,8 +232,6 @@ body =
 Smith.Kino.render(body, label: "Finished chassis and cable access")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-5-body" data-model="body" data-label="Finished chassis and cable access"></div> -->
-
 ## 6. Build the board tray
 
 The four mounting posts use the same coordinates as the PCB. Their tops define the board's underside. A 2.1 mm pilot is an initial choice for an M2.5 screw in printed plastic; test your material and screw before fitting the board.
@@ -278,7 +270,7 @@ Kino.Layout.grid(
 
 <!-- <div class="smith-doc-preview" data-preview="pi-board-on-tray" data-model="board_on_tray" data-label="Board on the tray"></div> -->
 
-## 7. Give the tray its own front panel
+## 7. Add tray front panel
 
 The front panel travels with the board, so its three large socket openings stay aligned during removal. The low horizontal slot is a finger pull. The panel and tray are fused into one printable part.
 
@@ -316,8 +308,6 @@ tray =
 
 Smith.Kino.render(tray, label: "Service tray, front panel, and latch bearing")
 ```
-
-<!-- <div class="smith-doc-preview" data-preview="pi-7-tray" data-model="tray" data-label="Service tray, front panel, and latch bearing"></div> -->
 
 ## 8. Loft the cooling duct
 
@@ -443,8 +433,6 @@ lid =
 Smith.Kino.render(lid, label: "Lid with a fitted duct opening and service slot")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-10-lid" data-model="lid" data-label="Lid with a fitted duct opening and service slot"></div> -->
-
 ## 11. Design a replaceable grille
 
 The grille's perimeter and mounting holes form its interface. The slots are a separate feature function. Keeping those separate lets us compare patterns without changing the parts that mate with it.
@@ -553,8 +541,6 @@ cam =
 Smith.Kino.render(cam, label: "Cam, shaft, and thumb knob")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-13-cam" data-model="cam" data-label="Cam, shaft, and thumb knob"></div> -->
-
 ## 14. Assemble the service cartridge
 
 A nested assembly keeps the tray, latch, board, and cooler together. Hardware is reference geometry: it follows the cartridge but does not enter the print pack.
@@ -584,8 +570,6 @@ end
 
 Smith.Kino.render(cartridge_result, label: "Tray with the cam locked")
 ```
-
-<!-- <div class="smith-doc-preview" data-preview="pi-14-cartridge-result" data-model="cartridge_result" data-label="Tray with the cam locked"></div> -->
 
 ## 15. Define the drawer motion
 
@@ -802,8 +786,6 @@ References stay out of the manufactured assembly preview. Fetch them explicitly 
 Smith.Kino.render(exploded, label: "Enclosure, covers, service cartridge, and feet")
 ```
 
-<!-- <div class="smith-doc-preview" data-preview="pi-19-exploded" data-model="exploded" data-label="Enclosure, covers, service cartridge, and feet"></div> -->
-
 ## 19. Create drawings from the same geometry
 
 The 3D preview is useful for inspecting form. A drawing makes port layout and hidden features easier to compare. These views come from the evaluated tray, so there is no second outline to keep synchronized.
@@ -875,14 +857,14 @@ Kino.DataTable.new([
 
 Start with the rail coupon and a screw-pilot test in the intended material. Check the PCB, cooler, and cable envelopes against the physical hardware before committing to the full print.
 
-| Hardware | Starting specification | Purpose |
-| --- | --- | --- |
-| 4 screws | M2.5 × 6 mm | Board to tray; printed pilots need a fit test |
-| 4 screws | M3 × 8 mm, countersunk | Lid to chassis; verify head profile and pilot fit |
-| 4 screws and nuts | M2 × 10 mm | Top grille, duct flange, and lid |
-| 2 screws and nuts | M2 × 8 mm | Rear grille |
-| 1 screw and washer | M2 × 30 mm | Cam retention from below the tray; adjust length/washer stack for free rotation |
-| 4 feet | Printed TPU or suitably sized rubber | Grip and separation from the desk |
+| Hardware           | Starting specification               | Purpose                                                                         |
+| ------------------ | ------------------------------------ | ------------------------------------------------------------------------------- |
+| 4 screws           | M2.5 × 6 mm                         | Board to tray; printed pilots need a fit test                                   |
+| 4 screws           | M3 × 8 mm, countersunk              | Lid to chassis; verify head profile and pilot fit                               |
+| 4 screws and nuts  | M2 × 10 mm                          | Top grille, duct flange, and lid                                                |
+| 2 screws and nuts  | M2 × 8 mm                           | Rear grille                                                                     |
+| 1 screw and washer | M2 × 30 mm                          | Cam retention from below the tray; adjust length/washer stack for free rotation |
+| 4 feet             | Printed TPU or suitably sized rubber | Grip and separation from the desk                                               |
 
 Fit the board with the Active Cooler already installed. Check screw engagement without letting tips reach the PCB. Fit the cam and its retaining screw, then confirm it rotates freely. Slide in the tray, fit the rear grille and lid assembly, and turn the cam into the keeper. Unplug cables before withdrawing the tray.
 
@@ -890,7 +872,7 @@ Check that every plug seats fully, the microSD card is accessible, the fan turns
 
 ### Explore the design
 
-- Change the grille slant from 65° to 115°. Its interface stays fixed; inspect both variants before choosing one.
-- Change a duct station's center or size, then rerun the lid-clearance and hardware checks. Watch how a local profile change affects another part.
-- Make a thinner rail coupon by shortening only its intersection tool. The mating profile should remain identical.
-- Increase the cooler envelope height until the cover check fails. Find the interfering part, then decide whether to raise the lid or change the duct.
+* Change the grille slant from 65° to 115°. Its interface stays fixed; inspect both variants before choosing one.
+* Change a duct station's center or size, then rerun the lid-clearance and hardware checks. Watch how a local profile change affects another part.
+* Make a thinner rail coupon by shortening only its intersection tool. The mating profile should remain identical.
+* Increase the cooler envelope height until the cover check fails. Find the interfering part, then decide whether to raise the lid or change the duct.
