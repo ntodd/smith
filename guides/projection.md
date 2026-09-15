@@ -1,6 +1,7 @@
 # Project curves onto surfaces
 
-Projection transfers boundary curves to target surfaces. It does not intersect
+Projection transfers boundary curves to target surfaces, similar to casting the
+outline of a shape onto another surface. Start with [workplanes and sketches](sketches.md). It does not intersect
 filled sketch material with a body. Use it to place an outline on a face, measure
 a curve on a curved surface, or create a planar profile for another operation.
 Coordinates stay in world space.
@@ -160,7 +161,7 @@ true = files.verification.mesh.watertight
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-The [projection Livebook](https://github.com/ntodd/smith/blob/main/examples/projection.livemd)
+The [projection Livebook](../examples/projection.livemd)
 shows these stages and exports a two-part print pack. Orthographic drawings and
 hidden-line removal are separate operations; this API projects source curves
 onto supplied target geometry.

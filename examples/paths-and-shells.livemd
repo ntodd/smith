@@ -1,16 +1,16 @@
-# Smith — Paths, smooth lofts, and hollow parts
+# Paths, smooth lofts, and hollow parts
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). All dimensions below are millimeters. Each preview can be rotated, zoomed, opened fullscreen, or downloaded as a PNG.
+After [sketches and solid forms](profiles.livemd), build three separate samples: an open tray, a swept bend, and a transition between profiles. These simple shapes make wall thickness and section placement visible.
 
-Restart the Livebook runtime after changing dependencies or native code.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
 
-This notebook builds three independent printable parts: an open tray, a curved rod, and a smooth transition. Recipes remain ordinary Elixir values, so changing a dimension and reevaluating dependent cells rebuilds the design.
 
 ## Start with a tray blank
 
@@ -74,7 +74,7 @@ Named assembly parts retain independent print placement. The positions below spr
 
 ```elixir
 assembly =
-  Assembly.new(:modeling_milestone)
+  Assembly.new(:shape_samples)
   |> Assembly.part(:tray, tray, print: [on_bed: true])
   |> Assembly.part(:bend, bend, position: {55, 0, 2}, print: [on_bed: true])
   |> Assembly.part(:transition, smooth, position: {100, 15, 0}, print: [on_bed: true])
@@ -88,7 +88,7 @@ This writes separate verified part bundles, assembly STEP, and a ZIP containing 
 
 ```elixir
 {:ok, files} = Smith.export(assembly_result, "output/models",
-  name: "modeling-milestone", tolerance: 0.03, angular_tolerance: 0.1)
+  name: "shape-samples", tolerance: 0.03, angular_tolerance: 0.1)
 files.print_pack
 ```
 

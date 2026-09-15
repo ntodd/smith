@@ -6,6 +6,9 @@ operation; native geometry is built by `Smith.evaluate/1`.
 
 ## Draft about a neutral plane
 
+Draft tilts walls, often so a part can leave a mold. The neutral plane is the
+reference at which the original footprint stays fixed.
+
 ```elixir
 alias Smith.{Plane, Selector}
 
@@ -31,11 +34,12 @@ other topology transitions can fail.
 
 ```elixir
 plane = Plane.xy(z: 6)
-lower = Smith.split(tapered, plane, keep: :negative)
-upper = Smith.split(tapered, plane, keep: :positive)
-both = Smith.split(tapered, plane)
+snapshot = Smith.from_result(result)
+lower = Smith.split(snapshot, plane, keep: :negative)
+upper = Smith.split(snapshot, plane, keep: :positive)
+both = Smith.split(snapshot, plane)
 
-cap = tapered
+cap = snapshot
   |> Smith.section(plane)
   |> Smith.translate({0, 0, -6})
   |> Smith.extrude({0, 0, 2})
@@ -115,7 +119,7 @@ sections and measure the resulting walls before relying on a part's fit.
 
 ## Preview and export
 
-The [forming Livebook](https://github.com/ntodd/smith/blob/main/examples/forming.livemd)
+The [forming Livebook](../examples/forming.livemd)
 shows these operations in stages, checks analytic volumes and section area, and
 exports a three-part assembly. Each preview supports fullscreen and PNG download.
 Use [verified export](exporting.md) for STL and 3MF fabrication files; open surfaces

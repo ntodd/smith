@@ -17,9 +17,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
+      # Test the companion OCEx 0.2 change before its Hex publication.
+      OCEX_PATH: ${{ github.workspace }}/.ci/ocex
+      OCEX_ARCHIVE: ${{ github.workspace }}/.ci/ocex/ocex-0.2.0.tar
       OpenCASCADE_DIR: ${{ github.workspace }}/.occt/lib/cmake/opencascade
     steps:
       - uses: actions/checkout@v4
+      - name: Companion OCEx revision
+        uses: actions/checkout@v4
+        with:
+          repository: ntodd/ocex
+          ref: f09c5cdd8d978bac8955c6a5e49db939092f1742
+          path: .ci/ocex
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.beam.elixir }}
@@ -34,14 +43,16 @@ jobs:
         id: occt
         with:
           path: .occt
-          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps/ocex/scripts/**') }}
+          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.ci/ocex/scripts/**') }}
       - name: Build pinned OCCT
         if: steps.occt.outputs.cache-hit != 'true'
-        run: sh deps/ocex/scripts/install-occt.sh "$GITHUB_WORKSPACE/.occt"
+        run: sh .ci/ocex/scripts/install-occt.sh "$GITHUB_WORKSPACE/.occt"
       - name: Tests and documentation
         run: make check docs notebooks
       - name: Package and isolated consumer
-        run: make package package-smoke
+        run: |
+          (cd .ci/ocex && mix hex.build)
+          make package package-smoke
       - uses: actions/upload-artifact@v4
         with:
           name: smith-${{ matrix.os }}-${{ matrix.beam.elixir }}

@@ -1,8 +1,16 @@
 # Sketches, revolve, and loft
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
+
+## Before you start
+
+After [the plate](plate.livemd), compare three ways to make solids: push a ring-shaped sketch into depth, rotate a wall section into a sleeve, and connect two outlines with a loft.
+
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Draw a ring
 
@@ -16,6 +24,9 @@ Smith.Kino.render(outline, label: "1 · Ring sketch")
 ```
 
 ## Extrude along the normal
+
+The normal is perpendicular to the sketch. On the default XY plane, positive
+extrusion goes along +Z. The flat ring becomes a 4 mm thick washer.
 
 ```elixir
 ring = outline |> Smith.extrude(4)
@@ -35,6 +46,10 @@ Smith.Kino.render(sleeve, label: "Revolved sleeve")
 ```
 
 ## Connect sections with a ruled loft
+
+A ruled loft joins each pair of outlines directly. Here two rectangles at
+different heights make a tapered transition. A smooth multi-section version
+appears in [paths and shells](paths-and-shells.livemd).
 
 ```elixir
 transition = Smith.loft([

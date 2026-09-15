@@ -129,6 +129,11 @@ defmodule Smith.DocPreviews do
     snapshot(%{shape: shape, revision: hash(brep)}, label)
   end
 
+  defp snapshot([{_, {_, _, _}} | _] = layers, label) do
+    {:ok, data} = Smith.Kino.Data.build_layers(layers, label: label)
+    data
+  end
+
   defp snapshot(shapes, label) when is_list(shapes) do
     {:ok, compound} =
       OCEx.compound(

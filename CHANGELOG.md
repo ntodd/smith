@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+- Reorganize guides and Livebooks into a 0.2 learning path, with CAD terminology,
+  measured drawing lessons, and explicit limitations in the phone study.
+- Render drawings through `Smith.Kino.render/2` with responsive sizing, fullscreen,
+  and SVG download; screen sizing preserves the export's millimeter dimensions.
+
+- Add geometry-derived dimensions, bounded topology inspection, explicit containment/clearance checks, and JSON reports with revision-linked artifacts.
+- Add headless depth-buffered PNG views and colored stage comparisons without a browser or GPU.
+- Add measured SVG dimensions with extension lines, center marks, and explicit placement.
+- Add Kino standard views, native edge overlays, clipping controls, and colored layers.
+- Ship an agent modeling guide, an optional Smith CAD skill, and a curated repository `llms.txt` alongside ExDoc's generated index.
+
+- Add `Smith.from_result/1` to branch from evaluated geometry without rebuilding earlier operations.
+
+- Add world-space and sketch Bézier curves backed by OCEx 0.2.
+- Add an iPhone 17 Pro fit-dummy Livebook with dimensioned profile stations, documented approximations, feature checks, and verified one-piece/split print exports.
+
 - Add a Raspberry Pi enclosure Livebook covering reference geometry, a sliding tray, cam latch, cooling duct, clearance checks, and printable exports, with interactive previews in HexDocs.
 
 - Render geometry examples throughout the README, guides, and API docs from their accompanying code. Include SVG drawing outputs and still images for GitHub.

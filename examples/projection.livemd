@@ -1,19 +1,16 @@
-# Smith — Project an outline onto a surface
+# Project an outline onto a surface
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install the pinned toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
-Restart the Livebook runtime after changing native code.
-Units are millimeters. Each surface preview supports rotation, zoom, fullscreen,
-and PNG download.
+After [workplanes and sketches](profiles.livemd), transfer outlines onto surfaces. This focused lesson compares a flat target with a cylinder and turns one projected outline into a printable part.
 
-Projection produces curves. This notebook fills a single planar result to build
-a printable part, compares parallel and conical projection, and measures curves
-projected onto a cylinder. Earlier recipes remain reusable.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Define the source and target
 
@@ -52,7 +49,7 @@ Face recipes use a world displacement vector. Moving the ellipse 3 mm along Z
 makes this oblique solid. Its volume is the XY footprint area times 3 mm.
 
 ```elixir
-cap = profile |> Smith.extrude({0, 0, 3})
+cap = face_result |> Smith.from_result() |> Smith.extrude({0, 0, 3})
 {:ok, cap_result} = Smith.evaluate(cap)
 {:ok, volume} = OCEx.volume(cap_result.shape)
 true = abs(volume - 48 * :math.pi()) < 1.0e-6
@@ -79,7 +76,7 @@ Smith.Kino.render(enlarged_result, label: "5 · Conical projection")
 ## Measure a projection on a curved surface
 
 This line projects onto both sides of a cylinder. The two resulting arcs remain
-curves; Kino renders surfaces, so inspect sample coordinates here. Every sample
+curves; Kino can display these directly. Inspect sample coordinates as well. Every sample
 must lie on `x² + y² = 25` and `z = 5`. Projection uses exact native curves.
 
 ```elixir
@@ -101,6 +98,10 @@ end |> Kino.DataTable.new()
 Target face boundaries and holes clip the curves. Successful partial hits can
 produce open wires. A missed or failed source boundary returns `:projection_failed`.
 To project onto one side of a solid, select the target with `Smith.surface/2` first.
+
+```elixir
+Smith.Kino.render(curves_result, label: "Projected arcs", view: :top)
+```
 
 ## Export two printable parts
 

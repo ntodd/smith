@@ -1,6 +1,8 @@
 # Extrusion extent and taper
 
-Extrusion turns a filled planar profile into solid material. A sketch uses a signed
+Extrusion turns a filled planar profile into solid material. Read the basic
+[sketch extrusion](sketches.md#corners-and-extrusion) first; this guide changes
+how far the extrusion travels and how its walls slope. A sketch uses a signed
 distance along its local plane normal. A face recipe uses a world displacement
 vector. Holes pass through the result, and disconnected faces produce separate
 solids without fusing them.
@@ -124,5 +126,5 @@ true = files.verification.mesh.watertight
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-The [extrusion Livebook](https://github.com/ntodd/smith/blob/main/examples/extrusion.livemd)
+The [extrusion Livebook](../examples/extrusion.livemd)
 shows these stages, checks analytic volumes, and exports three parts as a print pack.

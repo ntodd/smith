@@ -1,19 +1,21 @@
-# Named assemblies
+# Assemblies
 
-Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.1.0"}])`, or in a Livebook.
+An assembly names parts and places them relative to one another without fusing
+them. A reference is hardware or another object you need to fit around but will
+not print. Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.2.0"}])`, or in a Livebook.
 
 ```elixir
 alias Smith.Assembly
 
-bracket = Smith.box(2, 3, 4)
+spacer_block = Smith.box(2, 3, 4)
 
 model =
   Assembly.new(:mount)
-  |> Assembly.part(:left, bracket,
+  |> Assembly.part(:left, spacer_block,
     position: {-10, 0, 20},
     print: [on_bed: true]
   )
-  |> Assembly.part(:right, bracket,
+  |> Assembly.part(:right, spacer_block,
     position: {10, 0, 20},
     rotation: {{0, 0, 1}, 180},
     print: [on_bed: true],
@@ -65,7 +67,7 @@ keep its named parts, print orientations, and separate printable files.
 
 ## Members and placement
 
-`Assembly.part/3,4` adds a manufactured part. `Assembly.reference/3,4` adds electronics, hardware, or other reference solids. Both accept an atom or string name and a `Smith.Model`. `Assembly.subassembly/4` adds another assembly under an instance name. Names start with an ASCII letter or digit and may then contain letters, digits, underscores, or hyphens. They are case-sensitive and must be unique across both kinds, including after underscores normalize to hyphens: `:wall_plate` and `"wall-plate"` identify the same name. `Assembly.fetch/2` uses the same lookup and returns `{:error, :unknown_part}` when absent.
+`Assembly.part/3,4` adds a manufactured part. `Assembly.reference/3,4` adds electronics, hardware, or other reference solids. Both accept an atom or string name and a `Smith.Model`. `Assembly.subassembly/4` adds another assembly under an instance name. Names start with an ASCII letter or digit and may then contain letters, digits, underscores, or hyphens. They are case-sensitive and must be unique among sibling parts, references, and subassemblies, including after underscores normalize to hyphens: `:wall_plate` and `"wall-plate"` identify the same name. `Assembly.fetch/2` uses the same lookup and returns `{:error, :unknown_part}` when absent.
 
 | Option                                             | Meaning                                                                    |
 | -------------------------------------------------- | -------------------------------------------------------------------------- |
@@ -94,8 +96,8 @@ Assembly-level member validation uses `operation: :assembly` and `step: nil`. Ne
 
 ## Reusable subassemblies
 
-Use an ordinary function to define a module, then instance its recipe more than
-once. Children rotate and translate in their local frame before parent transforms
+Build one assembly recipe, then place it more than once. For a parameterized
+module, put that construction in an ordinary function. Children rotate and translate in their local frame before parent transforms
 apply. Reused leaf recipes evaluate once across the whole tree. Names need only be
 unique among siblings.
 
@@ -155,7 +157,7 @@ Flat part filenames remain unchanged. The JSON `tree` retains local options,
 effective installed flags, revisions, and child nodes. Combined STEP remains
 geometry-only; it has no named XCAF product structure.
 
-The [nested assembly Livebook](https://github.com/ntodd/smith/blob/main/examples/nested-assemblies.livemd)
+The [nested assembly Livebook](../examples/nested-assemblies.livemd)
 builds and previews two modules and exports their printable leaves. A nested
 modeling error identifies the full path, such as `"left/base"`, while retaining
 the original failing operation and step.
@@ -178,12 +180,13 @@ By default export produces:
 
 Names are preserved in the Elixir result, report, and part filenames. The combined STEP currently contains an OCCT compound, not an XCAF product tree with named instances or materials. The shared viewer displays manufactured parts; reference geometry is available through `fetch/2` and its separate STEP.
 
-## Publication
+## Export identity and failures
 
-`output/current.json` is the single authoritative current manifest. Its `models` list contains preview records; its `assemblies` list contains complete assembly export reports. Find an assembly by its export `name`. The returned `files.report` points to the permanent report for that specific export.
+`files.report` identifies this export; `output/current.json` lists current exports.
+A failed check leaves the previous manifest intact. Run writers to one output
+root sequentially. The [export guide](exporting.md#publication-and-failures)
+explains file placement, atomic updates, and failure recovery.
 
-Files are written into new export directories. After the part mesh checks and requested STEP round trips pass, one manifest replacement publishes the complete assembly. A failure preserves previous current records and their files, although unpublished files may remain. Updating an assembly removes retired parts from the manifest and preserves unrelated models/assemblies. Standalone exports cannot replace parts owned by a named assembly.
-
-Run writers to one output root sequentially. This is atomic publication through one manifest; it is not a concurrent-writer protocol or a power-loss durability guarantee.
-
-Explore the [Livebook guide](livebook.md) and its runnable assembly notebook for reusable parts, placement, previews, and printable exports. See [joints and poses](joints.md) for named frames and directed connections. Closed linkages, materials, and named STEP product trees are not supported.
+Continue with [joints and poses](joints.md) for attachment frames and movement, or
+open the [assembly lesson](../examples/assembly.livemd) to build reusable feet and
+export a print pack.

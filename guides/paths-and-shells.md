@@ -66,7 +66,7 @@ longer = Path.append(straight, Smith.line({0, 0, 20}, {0, 0, 30}))
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-Use `Smith.line/2`, `Smith.arc/6`, and `Smith.spline/2` for its edges. Consecutive directed endpoints must agree within 1.0e-7 mm. Smith does not reverse edges or sort them into a path. Empty, disconnected, and closed paths fail during evaluation. A path is a wire; it has no printable volume on its own.
+Use `Smith.line/2`, `Smith.arc/6`, and `Smith.spline/2`, or `Smith.bezier/1` for its edges. Consecutive directed endpoints must agree within 1.0e-7 mm. Smith does not reverse edges or sort them into a path. Empty, disconnected, and closed paths fail during evaluation. A path is a wire; it has no printable volume on its own.
 
 ## Sweep a placed profile
 
@@ -101,7 +101,7 @@ true = abs(bend_volume - 40 * :math.pi() * :math.pi()) < 1.0e-5
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-The profile must have one closed boundary. Cutouts that create holes return `:sweep_profile_has_holes`. A profile in the wrong plane returns `:misaligned_profile`. The first version deliberately keeps placement explicit rather than guessing how an arbitrary profile should attach.
+The profile must have one closed boundary. Cutouts that create holes return `:sweep_profile_has_holes`. A profile in the wrong plane returns `:misaligned_profile`. Profile placement is explicit; Smith does not automatically attach it to the path.
 
 `frame: :corrected` uses OCCT's corrected Frenet frame; `frame: :frenet` uses its Frenet frame. This controls section orientation along the spine. Test nonsymmetric sections on your intended curve before choosing a frame.
 
@@ -130,33 +130,11 @@ smooth = Smith.loft(sections, ruled: false)
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-The default remains `ruled: true`, so existing recipes retain their geometry. Both modes require at least two sections with one closed boundary each. Section order controls traversal; OCCT chooses correspondence between their edges. Smooth interpolation can overshoot between sections. There are no seam controls, guide rails, or guaranteed continuity at caps.
-
-## Draw a local spline
-
-Sketch splines interpolate local points. They can be mixed with lines and arcs to close an outline:
-
-```elixir
-arched = Sketch.profile([
-  Sketch.spline([{0, 0}, {5, 4}, {10, 0}], {{1, 1}, {1, -1}}),
-  Sketch.line({10, 0}, {0, 0})
-])
-arched_part = arched |> Smith.extrude(3)
-```
-
-<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched" data-model="arched" data-label="Spline profile">
-<p>Interactive preview available in HexDocs.</p>
-</div>
-
-<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched-part" data-model="arched_part" data-label="Extruded spline">
-<p>Interactive preview available in HexDocs.</p>
-</div>
-
-The optional tangent pair specifies endpoint directions, not derivative magnitudes. Sketch placement rotates these directions with the plane and translates the interpolation points. This is distinct from `Smith.spline/2`, whose points and tangent vectors use world coordinates and whose result is an edge recipe suitable for a path.
+The default is `ruled: true`. Both modes require at least two sections with one closed boundary each. Section order controls traversal; OCCT chooses correspondence between their edges. Smooth interpolation can overshoot between sections. There are no seam controls, guide rails, or guaranteed continuity at caps.
 
 ## Preview and export
 
-With Kino installed, `Smith.Kino.render(tray)` directly returns a preview you can display as the last expression in a Livebook cell. The [worked notebook](https://github.com/ntodd/smith/blob/main/examples/paths-and-shells.livemd) compares ruled and smooth lofts, renders the construction stages, and exports all three parts as a named assembly.
+With Kino installed, `Smith.Kino.render(tray)` directly returns a preview you can display as the last expression in a Livebook cell. The [worked notebook](../examples/paths-and-shells.livemd) compares ruled and smooth lofts, renders the construction stages, and exports all three parts as a named assembly.
 
 ```elixir
 {:ok, files} = Smith.export(hollow, "output", name: "tray", on_bed: true, angular_tolerance: 0.1)

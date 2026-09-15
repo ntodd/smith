@@ -4,7 +4,8 @@ defmodule Smith.Model do
 
   Build recipes with `Smith` functions and pass them to `Smith.evaluate/1`.
   Each operation returns a new recipe; earlier values remain reusable.
-  Construction does not allocate native geometry.
+  Construction does not allocate native geometry. Recipes created with
+  `Smith.from_result/1` retain an existing native geometry snapshot.
 
   The `:operations` field is an internal representation stored in reverse
   construction order. Do not build or edit it directly. Retain your Elixir
@@ -474,6 +475,23 @@ defmodule Smith do
           Model.t()
   def arc(center, normal, x_direction, radius, start, sweep),
     do: new(:arc, [center, normal, x_direction, radius, start, sweep])
+
+  @doc """
+  Describes a polynomial Bézier edge using world-space control points.
+
+  Supply 2–26 `{x, y, z}` points. The first and last are endpoints;
+  interior points are control handles, not interpolation targets. Four
+  points define a cubic. The curve lies inside the control points' convex
+  hull. Use `Smith.Sketch.bezier/1` for local 2D profile segments.
+
+  Validation is deferred to evaluation. Point/count errors return a
+  `Smith.Error` for `:bezier` with reason `:invalid_argument`; native
+  construction failures retain their reason. See `OCEx.bezier/1` for
+  repeated-point and degree limits. An edge alone is not printable.
+  """
+  @doc group: "Profiles"
+  @spec bezier([OCEx.point3()]) :: Model.t()
+  def bezier(points), do: new(:bezier, [points])
 
   @doc """
   Describes an interpolated, nonperiodic B-spline edge in world coordinates.
@@ -1039,6 +1057,38 @@ defmodule Smith do
   @spec countersink(Model.t(), keyword()) :: Model.t()
   def countersink(model, opts), do: append(model, :countersink, opts)
 
+  @doc """
+  Starts a recipe from an already evaluated geometry snapshot.
+
+  Use this when branching from an expensive model in a notebook. Subsequent
+  operations reuse the result's native shape instead of rebuilding its source
+  recipe. The returned recipe is immutable; editing either branch does not
+  change the result or the other branch.
+
+  This retains a native resource in the current BEAM runtime. It is not a
+  portable or automatically updated recipe: rerun the source evaluation and
+  this call after changing upstream dimensions. Keep the original modeling
+  code as the editable design.
+
+  Accepts a `Smith.Result`, including face and curve results. It does not
+  accept an assembly result. During evaluation, a changed revision returns
+  `%Smith.Error{operation: :from_result, reason: :revision_mismatch}`.
+
+      iex> {:ok, blank} = Smith.box(20, 10, 4) |> Smith.evaluate()
+      iex> half = Smith.from_result(blank) |> Smith.split(Smith.Plane.xy(z: 2), keep: :positive)
+      iex> {:ok, result} = Smith.evaluate(half)
+      iex> {:ok, volume} = OCEx.volume(result.shape)
+      iex> abs(volume - 400.0) < 1.0e-6
+      true
+
+  <div class="smith-doc-preview" data-preview="api-from-result" data-model="result" data-label="Half of an evaluated block">
+  <p>Interactive preview available in HexDocs.</p>
+  </div>
+  """
+  @doc group: "Evaluation and export"
+  @spec from_result(Result.t()) :: Model.t()
+  def from_result(%Result{} = result), do: new(:from_result, [result])
+
   @spec evaluate(Model.t() | Smith.Assembly.t() | Smith.Sketch.t() | Smith.Path.t()) ::
           {:ok, Result.t() | Smith.Assembly.Result.t()} | {:error, Error.t() | atom()}
   @doc """
@@ -1059,7 +1109,8 @@ defmodule Smith do
 
   Evaluation is synchronous. It rebuilds a recipe on each call, except that
   equal member recipes within one assembly evaluation share their base
-  evaluation. User callback exceptions are not caught. See the
+  evaluation. Use `from_result/1` to reuse an evaluated stage across branches
+  or calls without rebuilding its source operations. User callback exceptions are not caught. See the
   [error guide](errors-and-limits.html) for details.
 
       iex> Smith.box(0, 10, 4) |> Smith.evaluate()
@@ -1160,6 +1211,16 @@ defmodule Smith do
   end
 
   defp finish(error), do: error
+
+  defp apply_operation(:from_result, nil, [%Result{shape: shape, revision: revision}]) do
+    with {:ok, brep} <- OCEx.to_brep(shape),
+         true <- Base.encode16(:crypto.hash(:sha256, brep), case: :lower) == revision do
+      {:ok, shape}
+    else
+      false -> {:error, :revision_mismatch}
+      error -> error
+    end
+  end
 
   defp apply_operation(:sketch, nil, [sketch]), do: Smith.Sketch.evaluate(sketch)
 
@@ -1279,7 +1340,7 @@ defmodule Smith do
   defp apply_operation(:box, nil, [x, y, z]), do: OCEx.box(x, y, z)
 
   defp apply_operation(op, nil, args)
-       when op in [:cylinder, :cone, :sphere, :torus, :edge, :arc, :spline],
+       when op in [:cylinder, :cone, :sphere, :torus, :edge, :arc, :spline, :bezier],
        do: apply(OCEx, op, args)
 
   defp apply_operation(:polygon, nil, [points]) when is_list(points) and length(points) >= 3 do

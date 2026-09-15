@@ -17,20 +17,22 @@ defmodule Smith.Drawing do
   </div>
 
   Use \x60Smith.Kino.render/2\x60 for a rotatable 3D preview. In Livebook, display
-  a drawing with \x60Kino.Image.new(svg, :svg)\x60. See the
+  a drawing with \x60Smith.Kino.render(drawing)\x60. See the
   [drawing guide](drawings.html) for view orientation and file export.
   """
   alias Smith.{Assembly, Plane, Result}
-  defstruct [:visible, :hidden, :plane, :source_revision]
+  defstruct [:visible, :hidden, :plane, :source_revision, dimensions: []]
 
   @opaque t :: %__MODULE__{
             visible: OCEx.Shape.t(),
             hidden: OCEx.Shape.t(),
             plane: Plane.t(),
-            source_revision: String.t()
+            source_revision: String.t(),
+            dimensions: [map()]
           }
   @type source ::
-          Smith.Model.t()
+          OCEx.Shape.t()
+          | Smith.Model.t()
           | Smith.Sketch.t()
           | Smith.Path.t()
           | Assembly.t()
@@ -38,7 +40,8 @@ defmodule Smith.Drawing do
           | Assembly.Result.t()
 
   @doc """
-  Evaluates a source and computes its orthographic drawing.
+  Evaluates a source and computes its orthographic drawing. Native
+  `OCEx.Shape` values are also accepted as geometry snapshots.
 
   Returns \x60{:ok, drawing}\x60. An existing result skips recipe evaluation;
   its BREP revision is checked before use. The drawing's \x60source_revision\x60
@@ -85,6 +88,33 @@ defmodule Smith.Drawing do
   end
 
   @doc """
+  Adds a geometry-derived dimension to an immutable drawing.
+
+  Takes a `Smith.Measure` from the same source revision. Options:
+  `orientation: :aligned | :horizontal | :vertical` (default aligned),
+  `offset: 5` mm, and `precision: 2` decimal places (0–6). For linear
+  dimensions, signed offset places the line above/below, right/left, or
+  along the aligned segment's perpendicular. For angles, its absolute value
+  is the annotation radius. Circular dimensions include center marks.
+
+  SVG includes extension lines, arrows, and measured labels in mm or degrees.
+  Placement is explicit; automatic collision avoidance and driving constraints
+  are not provided. Projected dimensions must retain the measured value;
+  foreshortened or edge-on measurements return `:dimension_out_of_plane`.
+  Stale measurements return `:revision_mismatch`. DXF currently rejects
+  annotated drawings with `:unsupported_annotations` rather than losing labels.
+  """
+  @spec dimension(t(), Smith.Measure.t(), keyword()) :: {:ok, t()} | {:error, term()}
+  def dimension(drawing, measurement, opts \\ [])
+
+  def dimension(%__MODULE__{} = drawing, measurement, opts) do
+    with {:ok, dimension} <- Smith.Drawing.Dimension.build(drawing, measurement, opts),
+         do: {:ok, %{drawing | dimensions: drawing.dimensions ++ [dimension]}}
+  end
+
+  def dimension(_, _, _), do: {:error, :invalid_argument}
+
+  @doc """
   Samples drawing curves into view-local XY polylines.
 
   Returns \x60{:ok, %{visible: polylines, hidden: polylines}}\x60. Each polyline
@@ -129,7 +159,8 @@ defmodule Smith.Drawing do
   boundary. Coordinates are reflected vertically for SVG's downward Y axis;
   the underlying drawing coordinates remain unchanged. Visible edges are
   solid black; hidden edges are gray with a 2 mm dash and 1 mm gap, painted
-  first. There are no fills, scripts, external assets, or dimensions.
+  first. Dimensions added with `dimension/3` include measured labels and
+  extension lines. There are no scripts or external assets.
 
   Returns \x60{:ok, binary}\x60, or \x60{:error, :empty_drawing}\x60 when the
   selected layers contain no points. Options and native errors follow
@@ -141,7 +172,11 @@ defmodule Smith.Drawing do
   def svg(%__MODULE__{} = drawing, opts) do
     with :ok <- options(opts, :svg),
          {:ok, lines} <- sample(drawing, opts),
-         {:ok, {xmin, ymin, xmax, ymax}} <- extent(lines) do
+         {:ok, {xmin, ymin, xmax, ymax}} <-
+           extent(%{
+             lines
+             | visible: lines.visible ++ [Smith.Drawing.Dimension.extent(drawing.dimensions)]
+           }) do
       stroke = Keyword.get(opts, :stroke_width, 0.25)
       margin = Keyword.get(opts, :padding, 5) + stroke / 2
       width = xmax - xmin + 2 * margin
@@ -154,9 +189,18 @@ defmodule Smith.Drawing do
         "<title>",
         title,
         "</title>",
+        "<metadata>",
+        escape(
+          JSON.encode!(%{
+            source_revision: drawing.source_revision,
+            dimensions: Enum.map(drawing.dimensions, &Smith.Geometry.json(&1.measurement))
+          })
+        ),
+        "</metadata>",
         ~s|<g transform="scale(1,-1)" fill="none" stroke-width="#{number(stroke)}" stroke-linejoin="round" stroke-linecap="round">|,
         svg_layer("hidden", lines.hidden, ~s|stroke="#777" stroke-dasharray="2 1"|),
         svg_layer("visible", lines.visible, ~s|stroke="#111"|),
+        Smith.Drawing.Dimension.svg(drawing.dimensions),
         "</g></svg>\n"
       ]
 
@@ -184,6 +228,8 @@ defmodule Smith.Drawing do
   """
   @spec dxf(t(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def dxf(drawing, opts \\ [])
+
+  def dxf(%__MODULE__{dimensions: [_ | _]}, _opts), do: {:error, :unsupported_annotations}
 
   def dxf(%__MODULE__{} = drawing, opts) do
     with {:ok, lines} <- polylines(drawing, opts) do
@@ -258,6 +304,8 @@ defmodule Smith.Drawing do
   after serialization succeeds. File-system failures return their reason.
   Other extensions return \x60:unsupported_format\x60. This writes a single
   drawing file without a model bundle, print validation, or manifest.
+  SVG supports measured annotations; annotated DXF export returns
+  `:unsupported_annotations`.
   """
   @spec write(t(), String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
   def write(drawing, path, opts \\ [])
@@ -274,6 +322,8 @@ defmodule Smith.Drawing do
   end
 
   def write(_, _, _), do: {:error, :invalid_argument}
+
+  defp result(%OCEx.Shape{} = shape), do: Smith.Geometry.snapshot(shape)
 
   defp result(%Result{} = result) do
     with {:ok, brep} <- OCEx.to_brep(result.shape) do

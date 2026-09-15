@@ -1,6 +1,6 @@
 # Modeling with functions and pipelines
 
-A Smith model records operations. Every operation returns a new recipe, so feature functions can accept a body, add a feature, and return the next body. `Smith.evaluate/1` executes the ordered operations and returns a native shape.
+A Smith model records operations. See [CAD concepts](cad-basics.md) for the geometry vocabulary. Every modeling operation returns a new recipe, so feature functions can accept a body, add a feature, and return the next body. `Smith.evaluate/1` executes the ordered operations and returns a native shape.
 
 ## Primitives and placement
 
@@ -50,7 +50,27 @@ solid primitive `at:` uses three world coordinates.
 
 `Smith.rotate(model, axis, degrees, origin)` uses a world axis vector and optional world origin (default zero). Rotation is right-handed. Transform order matters: translating then rotating moves the translated position around the rotation axis. Use `Smith.Plane` and local sketches for side-mounted profiles rather than manually rotating every point.
 
+## Spheres and rings
+
+`Smith.sphere(radius)` and `Smith.torus(major_radius, minor_radius)` default to centered bounds on all three axes. The torus lies around world Z; its major radius reaches the tube center, and its minor radius is the tube radius. Both support the standard world `at:` and three-axis `align:` options. Rotate the result for a different orientation. Tori must have major radius greater than minor radius by more than 1.0e-7 mm.
+
+```elixir
+ring = Smith.torus(10, 2, align: {:center, :center, :min})
+ball = Smith.sphere(3, at: {0, 0, 3})
+```
+
+<div class="smith-doc-preview" data-preview="mechanical-parts-0-ring" data-model="ring" data-label="Torus">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="mechanical-parts-0-ball" data-model="ball" data-label="Sphere">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
 ## Boolean composition
+
+A Boolean combines the material occupied by shapes. A boss is a raised pad, often
+used around a fastener; a bore is a cylindrical opening.
 
 `fuse/2` adds material, `cut/2` subtracts a tool, and `common/2` retains the intersection. Fuse and cut also accept ordered lists. An empty list leaves the recipe alone. Each operation resolves its tool recipe and cleans same-domain topology afterward.
 
@@ -149,6 +169,20 @@ drilled = base |> Smith.hole(on: :top, diameter: 3, through: :all)
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-All three recipes remain independent. Native geometry is immutable too. The evaluated `revision` is a SHA-256 hash of serialized BREP, useful for export identity and detecting stale results. It is not promised to remain identical across kernel versions or platforms, and it is not a parametric editing format. Keep the Elixir recipe as the design source.
+All three recipes remain independent. For a costly stage, evaluate once and branch
+from `Smith.from_result(result)` to avoid rebuilding it for each variant:
+
+```elixir
+{:ok, evaluated_base} = Smith.evaluate(base)
+snapshot = Smith.from_result(evaluated_base)
+rounded_snapshot = snapshot |> Smith.fillet(edges: {:parallel, :z}, radius: 1, count: 4)
+```
+
+<div class="smith-doc-preview" data-preview="modeling-snapshot" data-model="rounded_snapshot" data-label="Variant from evaluated geometry">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+A snapshot stays fixed until you reevaluate its source. Keep the recipe as the
+editable design. All three original recipes remain independent. Native geometry is immutable too. The evaluated `revision` is a SHA-256 hash of serialized BREP, useful for export identity and detecting stale results. It is not promised to remain identical across kernel versions or platforms, and it is not a parametric editing format. Keep the Elixir recipe as the design source.
 
 For measured filters, sorting, topology metadata, mirrored parts, blind holes, and recessed fasteners, see [mechanical parts](mechanical-parts.md).

@@ -1,0 +1,728 @@
+# Model an iPhone 17 Pro fit dummy
+
+```elixir
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## What we are making
+
+A phone-shaped gauge lets you test a case without repeatedly snapping it around an expensive phone. We will build the outside of an iPhone 17 Pro, locate the features a case must accommodate, then prepare two ways to print it: one complete dummy, or two registered halves joined with printed dowels.
+
+This advanced lesson uses Smith 0.2's Bézier curves. Read [sketches](profiles.livemd),
+[inspection](inspection.livemd), and the [enclosure walkthrough](raspberry-pi-enclosure.livemd) first. Work through the cells in order. Geometry previews are Smith's built-in Kino renderer: drag to orbit, scroll to zoom, and use **Fullscreen** for small details. The final cells export STEP, STL, and millimeter-based 3MF files. There is no Python, imported phone mesh, or hidden model file.
+
+The source is [Apple's iPhone 17 Pro dimensional drawing](https://developer.apple.com/download/files/accessories/dimensional-drawings/iphone-17-pro.pdf), drawing date 2025-09-09, PDF dated April 2026. Sheet numbers below refer to the drawing sheets, excluding the cover. Use the dimensions, not a ruler on the PDF: its title block says not to scale the drawing.
+
+**This model is still a study, not an accurate case-fit reference.** The smooth
+edge-roll loft contains an extra thin region near Z=0.085 mm. Step 5 exposes it
+with a section check. The rest of the lesson demonstrates modeling and print
+preparation while retaining that known defect; resolve it before judging case fit.
+
+The model is not an exact replica or a certified gauge. The drawing supplies useful coordinates and cross-section samples, but not the complete surface equations or manufacturing tolerances. The camera plateau's plan dimensions and blend are not fully dimensioned. We will keep those assumptions visible rather than burying them in the construction.
+
+The printable model represents external shape. It cannot test button actuation, cable retention, camera field of view, MagSafe alignment, radio performance, glass protection, or the real phone's tolerance stack. The small recesses are location witnesses, not working connectors.
+
+## 1. Choose datums and keep a dimension ledger
+
+Look at the **back** of the phone with its cameras at the top. X runs right, Y runs toward the top, and Z comes toward you. The lower-left corner of the nominal rectangular envelope is X=Y=0. The front face is Z=0; the main back face is Z=8.75.
+
+Apple gives many locations as distances down from the top. Convert those with `height - down`. Rear-view X coordinates copy directly. Front-view X coordinates become `width - x`. This matters: the power button and Camera Control are on the left in our rear view; action and volume buttons are on the right.
+
+| Feature                                                   | Dimension or location                | Basis                                                      |
+| --------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------- |
+| Main body                                                 | 71.85 × 150.01 × 8.75 mm           | Sheet 1 overall dimensions                                 |
+| Corner contour                                            | Seven coordinate stations per corner | Sheet 1, Detail A                                          |
+| Edge roll                                                 | Ten inset/depth pairs                | Sheet 1, Detail B; endpoints rounded in the drawing        |
+| Action / volume / side-button projection                  | 0.45 mm                              | Sheet 1                                                    |
+| Rear camera rims                                          | Three diameters of 16.20 mm          | Sheet 1, Detail D                                          |
+| Camera plateau rise                                       | 2.55 mm                              | Sheet 1 side-view dimension arrows                         |
+| Camera rim/glass rise above plateau                       | 1.88 mm                              | Interpretation of the next arrow span; verify physically   |
+| USB opening                                               | 9.00 × 3.14 mm                      | Sheet 1, Detail C                                          |
+| Bottom acoustic openings                                  | Ten diameters of 1.06 mm             | Sheet 1                                                    |
+| Camera plateau outline and intermediate loft              | Parameters below                     | Modeling assumption; measure before relying on a close fit |
+| Socket depths, cosmetic witness depths, lens rim rounding | Parameters below                     | Dummy construction choices                                 |
+
+The camera-height caption calls the second dimension “back plate to rear camera glass,” but its arrows span from the plateau to the camera front. Here we follow the arrows and use `8.75 + 2.55 + 1.88 = 13.18` mm overall. **Confirm that interpretation with calipers before using the dummy to judge a camera lip.** It is a parameter, not an unqualified claim about the hardware.
+
+```elixir
+alias Smith.{Assembly, Plane, Selector, Sketch}
+import ExUnit.Assertions, only: [assert: 1, assert_in_delta: 3]
+
+p = %{
+  width: 71.85,
+  height: 150.01,
+  thickness: 8.75,
+  plateau_rise: 2.55,
+  lens_rise: 1.88,
+  lens_radius: 8.10,
+  button_projection: 0.45,
+  button_width: 2.66,
+  port_depth: 2.0,
+  acoustic_depth: 1.2,
+  witness_depth: 0.15,
+  lens_witness_depth: 0.10,
+  lens_witness_radius: 7.45,
+  rim_round: 0.12,
+  pin_radius: 1.5,
+  pin_gap: 0.10,
+  pin_length: 5.6,
+  socket_depth: 3.0
+}
+
+p =
+  Map.merge(p, %{
+    mid_z: p.thickness / 2,
+    plateau_z: p.thickness + p.plateau_rise,
+    lens_z: p.thickness + p.plateau_rise + p.lens_rise
+  })
+
+camera_centers = [{14.37, 14.37}, {14.37, 33.61}, {32.36, 23.99}]
+
+corner_points = [
+  {19.43, 0.00},
+  {13.90, 0.04},
+  {8.46, 0.92},
+  {3.80, 3.80},
+  {0.92, 8.46},
+  {0.04, 13.90},
+  {0.00, 19.43}
+]
+
+Kino.DataTable.new([
+  %{feature: "Body", width: p.width, length: p.height, height: p.thickness},
+  %{feature: "Including camera rims", width: p.width, length: p.height, height: p.lens_z}
+])
+```
+
+## 2. Build a corner with a defined envelope
+
+A circular fillet is a useful first sketch, but it does not pass through all of Detail A's stations. An interpolating spline passes through them, but can overshoot: with these points and tangent ends, an interpolating spline with these endpoint tangents can extend about 0.01 mm outside the intended coordinate envelope.
+
+A cubic Bézier has four control points. It touches its first and last points, and its entire curve stays in the convex hull of all four. We will use one cubic between each pair of drawing stations, choosing handles inside that pair's coordinate rectangle. The pieces share tangent vectors. This gives a smooth tangent transition without inventing a single “iPhone corner radius.” It is C1 interpolation, not a reconstruction of Apple's undisclosed curvature law.
+
+The small module below contains the interpolation and symmetry math. Geometry still comes from Smith's standard primitives. `segments/1` is deliberately specific to this corner table: its first tangent is horizontal and its last is vertical. It is not a general curve-fitting library.
+
+The harmonic mean makes a component's tangent small when either adjacent interval is small. At a sign change it becomes zero. For this monotone table, the control points stay between neighboring samples.
+
+```elixir
+defmodule PhoneProfile do
+  @moduledoc "Corner interpolation and symmetry for this reference phone."
+  alias Smith.{Plane, Sketch}
+
+  # Component-wise harmonic slopes keep each cubic in its endpoints' box.
+  def segments(points) do
+    pairs = Enum.chunk_every(points, 2, 1, :discard)
+    slopes = Enum.map(pairs, fn [{x, y}, {u, v}] -> {u - x, v - y} end)
+
+    middle =
+      for [{a, b}, {c, d}] <- Enum.chunk_every(slopes, 2, 1, :discard),
+          do: {harmonic(a, c), harmonic(b, d)}
+
+    {first_x, _} = hd(slopes)
+    {_, last_y} = List.last(slopes)
+    tangents = [{first_x, 0} | middle] ++ [{0, last_y}]
+
+    Enum.zip(pairs, Enum.chunk_every(tangents, 2, 1, :discard))
+    |> Enum.map(fn {[{x, y} = start, {u, v} = finish], [{a, b}, {c, d}]} ->
+      [start, {x + a / 3, y + b / 3}, {u - c / 3, v - d / 3}, finish]
+    end)
+  end
+
+  defp harmonic(a, b) when a * b > 0, do: 2 * a * b / (a + b)
+  defp harmonic(_, _), do: 0
+
+  def outline(segments, width, height, inset, z) do
+    # Shrink a corner toward its tangent intersection; this is a loft
+    # construction convention, not a claim of an exact normal offset.
+    extent = segments |> hd() |> hd() |> elem(0)
+
+    local = fn {x, y} ->
+      {inset + x * (extent - inset) / extent, inset + y * (extent - inset) / extent}
+    end
+
+    corner = Enum.map(segments, &Enum.map(&1, local))
+    reverse = fn curves -> Enum.map(Enum.reverse(curves), &Enum.reverse/1) end
+
+    quadrants = [
+      Enum.map(corner, &Enum.map(&1, fn {x, y} -> {x, height - y} end)),
+      reverse.(corner),
+      Enum.map(corner, &Enum.map(&1, fn {x, y} -> {width - x, y} end)),
+      Enum.map(reverse.(corner), &Enum.map(&1, fn {x, y} -> {width - x, height - y} end))
+    ]
+
+    edges =
+      Enum.zip(quadrants, tl(quadrants) ++ [hd(quadrants)])
+      |> Enum.flat_map(fn {curves, next} ->
+        Enum.map(curves, &Sketch.bezier/1) ++
+          [Sketch.line(List.last(List.last(curves)), hd(hd(next)))]
+      end)
+
+    Sketch.profile(edges, on: Plane.xy(z: z))
+  end
+end
+
+corner_segments = PhoneProfile.segments(corner_points)
+outline = PhoneProfile.outline(corner_segments, p.width, p.height, 0, 0)
+
+{:ok, outline_result} = Smith.evaluate(outline)
+Smith.Kino.render(outline_result, label: "Measured corner stations, repeated four times")
+```
+
+<!-- <div class="smith-doc-preview" data-preview="phone-outline" data-model="outline_result" data-label="Bézier phone outline"></div> -->
+
+## 3. Check the curve before making a solid
+
+A plausible silhouette is not a measurement. Check that each drawing station lies on the boundary, and that every cubic's control polygon stays inside its endpoint rectangle. The latter gives a geometric bound for the entire segment, rather than a sampling guess.
+
+Keep the face and the boundary separate. The distance from a point inside a face to that face is zero; that would not prove the point lies on its outline.
+
+```elixir
+{:ok, [outline_wire]} = OCEx.wires(outline_result.shape)
+
+for {x, down} <- corner_points do
+  {:ok, distance} = OCEx.distance_to_point(outline_wire, {x, p.height - down, 0})
+  assert_in_delta distance, 0, 1.0e-6
+end
+
+for controls <- corner_segments do
+  {x0, y0} = hd(controls)
+  {x1, y1} = List.last(controls)
+
+  for {x, y} <- controls do
+    assert x >= min(x0, x1) and x <= max(x0, x1)
+    assert y >= min(y0, y1) and y <= max(y0, y1)
+  end
+end
+
+Kino.Markdown.new(
+  "Every corner station is on the outline. Every Bézier segment stays inside its endpoint rectangle."
+)
+```
+
+## 4. Shape the front and rear edge roll
+
+Detail B gives inset from the outside wall against signed depth from the phone's midplane. Convert depth to our Z datum with `mid_z - signed_depth`. Its displayed ±4.38 endpoints are rounded; we use the explicitly dimensioned overall thickness of 8.75 mm and clamp those endpoints to Z=0 and Z=8.75.
+
+The front and rear roll are different. A box with one fillet radius would erase that difference. Instead, make a series of nested outlines and loft through them. The inset corners shrink toward their tangent intersections; this is our interpolation convention, **not an exact parallel offset** of the outer curve. Only the outer corner contour and the straight-side stations are specified and checked here.
+
+A smooth loft can overshoot between sections. Intersect it with the outer-profile prism and the nominal bounding box. These explicit envelopes prevent the dummy from quietly becoming wider or longer. The interpolation between stations remains an approximation; there is no supplied error bound against the real phone.
+
+```elixir
+edge_samples = [
+  {2.61, 4.38},
+  {1.20, 4.29},
+  {0.90, 4.24},
+  {0.15, 2.99},
+  {0.01, 1.50},
+  {0.00, -1.44},
+  {0.17, -2.86},
+  {0.97, -4.01},
+  {2.35, -4.35},
+  {3.79, -4.38}
+]
+
+stations =
+  Enum.map(edge_samples, fn {inset, signed_depth} ->
+    {inset, min(p.thickness, max(0.0, p.mid_z - signed_depth))}
+  end)
+  |> Enum.concat([{0.0, p.mid_z}])
+  |> Enum.sort_by(&elem(&1, 1))
+
+profiles =
+  for {inset, z} <- stations,
+      do: PhoneProfile.outline(corner_segments, p.width, p.height, inset, z)
+
+body =
+  Smith.loft(profiles, ruled: false)
+  |> Smith.common(Smith.extrude(outline, p.thickness))
+  |> Smith.common(Smith.box(p.width, p.height, p.thickness))
+
+{:ok, body_result} = Smith.evaluate(body)
+Smith.Kino.render(body_result, label: "Different front and rear edge profiles")
+```
+
+## 5. Measure the body at the drawing stations
+
+Measure against the skin, not against the filled solid: an interior point also has zero distance to a solid. Check opposite sides and both ends, away from the corners. We also keep the corner stations on the widest section and check the final mesh envelope.
+
+The extra `{0, mid_z}` section establishes the nominal widest profile in the straight-wall region. Detail B's 0.01 mm inset at the preceding station is retained.
+
+```elixir
+{:ok, body_faces} = OCEx.faces(body_result.shape)
+{:ok, body_skin} = OCEx.compound(body_faces)
+
+for {inset, z} <- stations,
+    point <- [
+      {inset, p.height / 2, z},
+      {p.width - inset, p.height / 2, z},
+      {p.width / 2, inset, z},
+      {p.width / 2, p.height - inset, z}
+    ] do
+  {:ok, distance} = OCEx.distance_to_point(body_skin, point)
+  assert_in_delta distance, 0, 1.0e-5
+end
+
+for {x, down} <- corner_points do
+  {:ok, distance} = OCEx.distance_to_point(body_skin, {x, p.height - down, p.mid_z})
+  assert_in_delta distance, 0, 1.0e-5
+end
+
+{:ok, body_mesh} = OCEx.mesh(body_result.shape, 0.02, 0.3)
+
+for {x, y, z} <- body_mesh.vertices do
+  assert x >= -1.0e-5 and x <= p.width + 1.0e-5
+  assert y >= -1.0e-5 and y <= p.height + 1.0e-5
+  assert z >= -1.0e-5 and z <= p.thickness + 1.0e-5
+end
+
+Kino.Markdown.new("Body station checks passed. The mesh stays inside the nominal body envelope.")
+```
+
+### Check between the stations
+
+The point checks above establish agreement only at their probes. A cropped section
+of the straight edge should have one filled region. The present smooth loft gives
+two: the main section and an extra thin strip. Keep this failure visible instead
+of treating the passing point checks as proof of a correct edge roll.
+
+```elixir
+edge_crop = body_result |> Smith.from_result()
+  |> Smith.common(Smith.box(10, 10, 8.75, at: {30, 0, 0}))
+  |> Smith.section(Plane.xy(z: 0.085))
+{:ok, edge_section} = Smith.evaluate(edge_crop)
+{:ok, edge_report} = Smith.Inspection.run(%{slice: edge_section}, checks: [
+  {:topology, :slice, :faces, expected: 1}
+])
+Kino.DataTable.new(Enum.map(edge_report.checks, &Map.take(&1, [:status, :measured, :expected])))
+```
+
+A `:failed` row is the known model defect, not a failed library call. An `:error`
+row would instead mean the check could not run. If you revise the loft, rerun this
+requirement without changing its expected count. The strip is small enough to be
+hard to see in a preview; the topology report makes it visible numerically.
+
+## 6. Add the camera plateau
+
+The plateau is the largest unresolved fit surface in the drawing. Its rise is dimensioned, but its footprint, transition radii, and intermediate sections are not. The table below is an adjustable **design assumption**, chosen to contain the dimensioned camera locations and resemble the illustrated form. These values are not measurements extracted by scaling the PDF.
+
+Do not use this dummy to approve a closely fitted plateau recess until those parameters have been checked against a phone or authoritative 3D geometry. The remaining steps demonstrate feature placement; the unresolved edge roll also prevents treating the full dummy as an accurate gauge.
+
+The broad bottom section starts at the midplane, inside the body. Starting it just below the back face would leave a shelf over the rolled edge: the back face is narrower than the phone at mid-thickness. The buried base lets the plateau meet the curved body without that exposed underside. The loft sections remain construction choices; the final height is the dimensioned 2.55 mm rise.
+
+Check that the entire bottom face is inside the body. A successful union alone would not catch a partly exposed shelf.
+
+```elixir
+plateau_sections = [
+  {69.45, 47.60, 14.0, p.mid_z},
+  {67.45, 45.60, 13.0, p.thickness + 0.45},
+  {63.25, 40.80, 10.4, p.plateau_z}
+]
+
+plateau_center = {p.width / 2, p.height - 24.0}
+
+plateau_profiles =
+  for {width, height, radius, z} <- plateau_sections do
+    Sketch.rounded_rectangle(width, height, radius, at: plateau_center, on: Plane.xy(z: z))
+  end
+
+{:ok, plateau_base} = plateau_profiles |> hd() |> Smith.evaluate()
+{:ok, support} = Smith.Inspection.run(%{base: plateau_base, body: body_result}, checks: [
+  {:contained, :base, :body, tolerance: 1.0e-7}
+])
+:passed = support.status
+
+plateau = Smith.loft(plateau_profiles, ruled: false)
+with_plateau = body_result |> Smith.from_result() |> Smith.fuse(plateau)
+{:ok, plateau_result} = Smith.evaluate(with_plateau)
+Smith.Kino.render(plateau_result, label: "Camera plateau: adjustable blend and footprint")
+```
+
+## 7. Locate the three camera rims
+
+Place the circles from the rear-view datum. The 16.20 mm diameter and centers come directly from Detail D. The rim rounding is an assumed 0.12 mm edge treatment. Selecting circular edges avoids accidentally selecting the seam of a cylinder.
+
+Each rim overlaps the plateau by 0.10 mm. That overlap is inside the phone, so it does not change its external height. A later shallow recess will make the rim legible in a monochrome print while retaining the full height around it.
+
+```elixir
+lenses =
+  for {x, down} <- camera_centers do
+    Smith.cylinder(p.lens_radius, p.lens_rise + 0.10,
+      at: {x, p.height - down, p.plateau_z - 0.10}
+    )
+    |> Smith.fillet(edges: Selector.type(:circle), count: 2, radius: p.rim_round)
+  end
+
+with_cameras = plateau_result |> Smith.from_result() |> Smith.fuse(lenses)
+{:ok, camera_result} = Smith.evaluate(with_cameras)
+Smith.Kino.render(camera_result, label: "Dimensioned camera centers and rim diameters")
+```
+
+## 8. Add buttons on side planes
+
+The dimensions 3.45, 5.60, and 8.85 are half-lengths in the side views, so the corresponding slots are 6.90, 11.20, and 17.70 mm long. All three raised-button types are 2.66 mm wide through the phone's thickness and project 0.45 mm.
+
+`Plane.yz` maps a slot's local X to world Y and its local Y to world Z. Its normal is +X. A negative extrusion therefore creates the left-side power button. The small inward overlap makes the union unambiguous.
+
+Camera Control is flush, not another 0.45 mm raised button. Its 17.10 × 3.03 mm capsule is shown as a shallow 0.18 mm recess. The full chamfer and tactile edge detail in Sheet 2 are not reconstructed; this is a visible location witness. Do not confuse this capsule with the larger finger-access keepout.
+
+```elixir
+button_locations = [
+  {:action, p.width, 34.28, 6.90, 1},
+  {:volume_up, p.width, 48.43, 11.20, 1},
+  {:volume_down, p.width, 62.63, 11.20, 1},
+  {:side, 0.0, 55.53, 17.70, -1}
+]
+
+buttons =
+  for {_name, x, down, length, direction} <- button_locations do
+    Sketch.slot(length, p.button_width,
+      on: Plane.yz(x: x - direction * 0.10),
+      at: {p.height - down, p.mid_z}
+    )
+    |> Smith.extrude(direction * (p.button_projection + 0.10))
+  end
+
+camera_control =
+  Sketch.slot(17.10, 3.03, on: Plane.yz(x: -0.10), at: {p.height - 98.40, p.mid_z})
+  |> Smith.extrude(0.28)
+
+with_controls = camera_result |> Smith.from_result() |> Smith.fuse(buttons) |> Smith.cut(camera_control)
+{:ok, controls_result} = Smith.evaluate(with_controls)
+Smith.Kino.render(controls_result, label: "Raised buttons and flush Camera Control")
+```
+
+## 9. Cut the bottom openings and rear witnesses
+
+The bottom view supplies ten acoustic openings and two screw locations. Mirror its front-view X coordinates into our rear-view convention. All twelve centers lie at mid-thickness. The screw centers are 29.00 and 42.85 mm; 31.43 and 40.43 mm mark the USB opening's edges, not screw centers. The USB slot's 9.00 × 3.14 mm opening is distinct from the recommended 12.45 × 6.60 mm connector clearance.
+
+The depth of these dummy openings is a construction choice: the source does not specify the connector internals. They are useful for checking whether a case opening is centered, not whether an actual plug seats. Likewise, flash, sensor, and lens recesses mark locations without claiming to reproduce optical components.
+
+We leave the front glass as the body's continuous surface. A display or Dynamic Island keepout should not become an invented physical bump on a fit gauge. Logo, antenna seams, SIM-tray engraving, and decorative glass seams are omitted; this is the case-contact model, not a cosmetic prop.
+
+```elixir
+usb =
+  Sketch.slot(9.00, 3.14, on: Plane.xz(y: -0.10), at: {p.width - 35.92, p.mid_z})
+  |> Smith.extrude(-(p.port_depth + 0.10))
+
+screw_x = [29.00, 42.85]
+
+acoustic_x = [15.40, 17.65, 19.91, 22.16, 24.42, 47.43, 49.69, 51.94, 54.20, 56.45]
+
+ports =
+  for x <- acoustic_x do
+    Sketch.circle(0.53, on: Plane.xz(y: -0.10), at: {p.width - x, p.mid_z})
+    |> Smith.extrude(-(p.acoustic_depth + 0.10))
+  end
+
+screws =
+  for x <- screw_x do
+    Sketch.circle(0.75, on: Plane.xz(y: -0.10), at: {p.width - x, p.mid_z})
+    |> Smith.extrude(-0.40)
+  end
+
+rear_witnesses =
+  for {x, down, radius} <- [
+        {58.03, 13.82, 3.40},
+        {58.03, 34.16, 3.325},
+        {58.03, 23.99, 0.525}
+      ] do
+    Sketch.circle(radius, on: Plane.xy(z: p.plateau_z + 0.01), at: {x, p.height - down})
+    |> Smith.extrude(-(p.witness_depth + 0.01))
+  end
+
+lens_witnesses =
+  for {x, down} <- camera_centers do
+    Sketch.circle(p.lens_witness_radius,
+      on: Plane.xy(z: p.lens_z + 0.01),
+      at: {x, p.height - down}
+    )
+    |> Smith.extrude(-(p.lens_witness_depth + 0.01))
+  end
+
+phone =
+  controls_result
+  |> Smith.from_result()
+  |> Smith.cut([usb | ports ++ screws])
+  |> Smith.cut(rear_witnesses ++ lens_witnesses)
+
+{:ok, phone_result} = Smith.evaluate(phone)
+Smith.Kino.render(phone_result, label: "Complete nominal fit dummy")
+```
+
+## 10. Check solid geometry and feature placement
+
+A shape can look right while a button is on the wrong side, or a cutter has missed the body. These checks measure surface points on every raised button and the camera rims, then verify that the USB and acoustic opening centers have empty space.
+
+The camera-rim probes are inside the flat top annulus, outside the shallow lens witness. The port probes stop short of the dummy floors. A positive distance there demonstrates a recess rather than merely checking the cutter's coordinates.
+
+```elixir
+assert {:ok, true} = OCEx.valid?(phone_result.shape)
+assert {:ok, [_]} = OCEx.solids(phone_result.shape)
+{:ok, faces} = OCEx.faces(phone_result.shape)
+{:ok, skin} = OCEx.compound(faces)
+
+for {_name, x, down, _length, direction} <- button_locations do
+  point = {x + direction * p.button_projection, p.height - down, p.mid_z}
+  {:ok, distance} = OCEx.distance_to_point(skin, point)
+  assert_in_delta distance, 0, 1.0e-6
+end
+
+for {x, down} <- camera_centers do
+  point = {x + p.lens_radius - p.rim_round - 0.10, p.height - down, p.lens_z}
+  {:ok, distance} = OCEx.distance_to_point(skin, point)
+  assert_in_delta distance, 0, 1.0e-5
+end
+
+for x <- acoustic_x do
+  {:ok, distance} = OCEx.distance_to_point(phone_result.shape, {p.width - x, 0.5, p.mid_z})
+  assert distance > 0.50
+end
+
+# Probe inside each shallow screw recess, not just its construction sketch.
+for x <- screw_x do
+  {:ok, distance} = OCEx.distance_to_point(phone_result.shape, {p.width - x, 0.10, p.mid_z})
+  assert_in_delta distance, 0.20, 1.0e-6
+end
+
+# Rounded drawing dimensions put the two screws symmetrically about 35.925.
+assert_in_delta Enum.sum(screw_x) / 2, p.width / 2, 1.0e-7
+
+{:ok, usb_clearance} = OCEx.distance_to_point(phone_result.shape, {p.width - 35.92, 0.5, p.mid_z})
+assert usb_clearance > 1.0
+
+{:ok, control_recess} =
+  OCEx.distance_to_point(phone_result.shape, {0.05, p.height - 98.40, p.mid_z})
+
+assert_in_delta control_recess, 0.13, 1.0e-5
+
+{:ok, phone_mesh} = OCEx.mesh(phone_result.shape, 0.02, 0.3)
+
+measured =
+  for axis <- 0..2 do
+    values = Enum.map(phone_mesh.vertices, &elem(&1, axis))
+    {Enum.min(values), Enum.max(values)}
+  end
+
+for {{low, high}, {expected_low, expected_high}} <-
+      Enum.zip(measured, [
+        {-p.button_projection, p.width + p.button_projection},
+        {0.0, p.height},
+        {0.0, p.lens_z}
+      ]) do
+  assert_in_delta low, expected_low, 1.0e-5
+  assert_in_delta high, expected_high, 1.0e-5
+end
+
+Kino.Markdown.new(
+  "One valid solid. Button surfaces, camera heights, port recesses, and overall mesh dimensions passed."
+)
+```
+
+## 11. Show clearance geometry separately
+
+The larger outline around USB is **space for a plug housing**, not the socket itself. Model that volume as a separate reference. The 12.45 × 6.60 mm recommendation uses R3.25 ends in Detail C, so use a rounded rectangle rather than a perfect capsule.
+
+This scene is illustrative: it does not implement all of Apple's camera, flash, sensor, Camera Control, or magnetic keepouts. Those include angular and material constraints that a plastic phone dummy cannot test. Keeping the reference separate prevents accidentally fusing a clearance volume into the printed phone.
+
+```elixir
+connector_clearance =
+  Sketch.rounded_rectangle(12.45, 6.60, 3.25, on: Plane.xz(), at: {p.width - 35.92, p.mid_z})
+  |> Smith.extrude(14.0)
+
+clearance_scene = Smith.compound([Smith.from_result(phone_result), connector_clearance])
+
+Smith.Kino.render(clearance_scene,
+  label: "USB connector keepout: reference only, not part of the dummy"
+)
+```
+
+## 12. Split at mid-thickness for printing
+
+A full phone has rounded front edges and a raised camera plateau. Printing it flat forces a choice about bed contact and overhangs. Splitting at the midplane gives both halves a broad mating face for the bed. It also bisects the USB and acoustic openings, so those cavities are open at the bed instead of long bridges.
+
+Reuse `phone_result` with `Smith.from_result/1`, cut the two sockets once, then branch from that evaluated result to split the halves. This avoids rebuilding the body, plateau, buttons, and openings for each half. The snapshot holds native geometry in this runtime; rerunning the earlier cells produces a new result when dimensions change.
+
+Cut two sockets through the mating plane, then provide separate dowels. The sockets are 0.10 mm larger in radius than the pins, and 0.20 mm deeper per side than half the pin length. These are initial printing allowances, not phone dimensions. Adjust `pin_gap` after a small test print.
+
+The two halves retain the same external phone geometry. Their only new voids are the internal sockets. `Assembly` keeps print orientation separate from installed position, so the teaching view remains assembled while each exported half lands on the correct face.
+
+```elixir
+pin_centers = [{p.width / 2, 40.0}, {p.width / 2, 105.0}]
+
+sockets =
+  for {x, y} <- pin_centers do
+    Smith.cylinder(p.pin_radius + p.pin_gap, 2 * p.socket_depth,
+      at: {x, y, p.mid_z - p.socket_depth}
+    )
+  end
+
+{:ok, socketed_result} =
+  phone_result |> Smith.from_result() |> Smith.cut(sockets) |> Smith.evaluate()
+
+socketed_phone = Smith.from_result(socketed_result)
+front = Smith.split(socketed_phone, Plane.xy(z: p.mid_z), keep: :negative)
+back = Smith.split(socketed_phone, Plane.xy(z: p.mid_z), keep: :positive)
+
+pin =
+  Smith.cylinder(p.pin_radius, p.pin_length)
+  |> Smith.chamfer(edges: Selector.type(:circle), count: 2, distance: 0.25)
+
+print_assembly =
+  Assembly.new(:phone_print)
+  |> Assembly.part(:front, front,
+    print: [rotation: {{1, 0, 0}, 180}, on_bed: true],
+    exploded_offset: {-45, 0, -12}
+  )
+  |> Assembly.part(:back, back, print: [on_bed: true], exploded_offset: {45, 0, 12})
+
+print_assembly =
+  pin_centers
+  |> Enum.with_index(1)
+  |> Enum.reduce(print_assembly, fn {{x, y}, index}, assembly ->
+    Assembly.part(assembly, "pin-#{index}", pin,
+      position: {x, y, p.mid_z - p.pin_length / 2},
+      print: [on_bed: true]
+    )
+  end)
+
+{:ok, print_result} = Smith.evaluate(print_assembly)
+{:ok, exploded} = Assembly.view(print_result, :exploded)
+Smith.Kino.render(exploded, label: "Two halves, two alignment dowels")
+```
+
+## 13. Check that splitting only removed the sockets
+
+Volume conservation catches an accidentally discarded half. The two complete socket cylinders lie inside the phone, so their volume is known analytically. The front/back intersection must be empty in volume, and the installed pins must clear both halves. We also compare a compound of both halves directly with the socketed phone in both directions; this catches a shape difference that equal total volumes could miss. The compound groups the halves without fusing their coincident mating faces back together. Reuse the socketed result from the previous cell rather than rebuilding it for this check.
+
+The two set-difference checks deliberately compare the complete curved solids. They are much more expensive than the split itself: expect this cell to take tens of seconds, depending on the machine. Reusing the existing result avoids reconstruction, but does not eliminate the kernel's surface-intersection work. These checks stay enabled.
+
+These are CAD checks. A print still needs flat mating faces, clean holes, and a measured seam with no glue or burrs holding the halves apart.
+
+```elixir
+{:ok, front_member} = Assembly.fetch(print_result, :front)
+{:ok, back_member} = Assembly.fetch(print_result, :back)
+{:ok, whole_volume} = OCEx.volume(phone_result.shape)
+{:ok, front_volume} = OCEx.volume(front_member.shape)
+{:ok, back_volume} = OCEx.volume(back_member.shape)
+
+removed =
+  length(pin_centers) * :math.pi() * :math.pow(p.pin_radius + p.pin_gap, 2) * 2 * p.socket_depth
+
+# Trimmed spline faces use numerical volume integration. Use the same
+# relative scale as the exporter, then check the actual set difference.
+assert_in_delta whole_volume - front_volume - back_volume, removed, whole_volume * 1.0e-6
+{:ok, halves} = OCEx.compound([front_member.shape, back_member.shape])
+
+for {a, b} <- [{socketed_result.shape, halves}, {halves, socketed_result.shape}] do
+  {:ok, difference} = OCEx.cut(a, b)
+  {:ok, volume} = OCEx.volume(difference)
+  assert_in_delta volume, 0, 1.0e-6
+end
+
+{:ok, overlap} = OCEx.common(front_member.shape, back_member.shape)
+{:ok, overlap_volume} = OCEx.volume(overlap)
+assert_in_delta overlap_volume, 0, 1.0e-7
+
+for index <- 1..2, half <- [front_member, back_member] do
+  {:ok, member} = Assembly.fetch(print_result, "pin-#{index}")
+  {:ok, overlap} = OCEx.common(half.shape, member.shape)
+  {:ok, volume} = OCEx.volume(overlap)
+  assert_in_delta volume, 0, 1.0e-7
+end
+
+Kino.Markdown.new(
+  "The halves conserve the phone's volume except for the two specified sockets. The installed dowels clear both halves."
+)
+```
+
+## 14. Export and measure the print
+
+Export both alternatives. The one-piece dummy is useful for resin printing, a different orientation in the slicer, or downstream CAD. The split assembly is intended for an FDM trial. Exporting does not imply either route has been physically validated.
+
+Smith checks the serialized STL for a closed, consistently oriented mesh and reads STEP back to compare validity, solid count, and volume. 3MF carries millimeter units and is generated from the checked mesh; it is not a slicer project. A 0.02 mm mesh deflection controls tessellation, not printer accuracy or agreement with the real phone.
+
+Files live under `output/iphone-17-pro` in the runtime's working directory. `current.json` records the current geometry revisions and file paths. Rerunning writes a new export ID; use the returned paths rather than guessing which old folder is newest.
+
+```elixir
+output = Path.expand("output/iphone-17-pro")
+
+metadata = %{
+  source: "Apple iPhone 17 Pro dimensional drawing, 2025-09-09, April 2026 PDF",
+  purpose: "nominal case-fit reference",
+  body_mm: [p.width, p.height, p.thickness],
+  overall_height_mm: p.lens_z,
+  unresolved: [
+    "camera plateau footprint and blend",
+    "camera-height caption interpretation",
+    "between-station surface interpolation",
+    "manufacturing and print tolerances"
+  ],
+  physically_verified: false
+}
+
+{:ok, complete_export} =
+  Smith.export(phone_result, output,
+    name: "iphone-17-pro",
+    on_bed: true,
+    tolerance: 0.02,
+    angular_tolerance: 0.3,
+    metadata: metadata
+  )
+
+{:ok, split_export} =
+  Smith.export(print_result, output,
+    name: "iphone-split",
+    tolerance: 0.02,
+    angular_tolerance: 0.3,
+    metadata: metadata
+  )
+
+Kino.Markdown.new("""
+Exports passed their geometry checks.
+
+* One-piece STL: `#{complete_export.stl}`
+* One-piece 3MF: `#{complete_export.three_mf}`
+* One-piece STEP: `#{complete_export.step}`
+* Split assembly and part paths: `#{Path.join(output, "current.json")}`
+
+Print the two halves and two dowels for the split version. Do not also print the one-piece dummy unless you want both alternatives.
+""")
+```
+
+## After resolving the model limitations
+
+Do not use the current edge roll to approve a close fit. Once it has been corrected
+and the missing dimensions verified, use this print-validation sequence:
+
+1. Print a dowel and a short socket coupon first if your printer's small-hole behavior is unknown. Change the dowel clearance, not the phone's overall scale.
+2. Print the halves with their exported mating faces on the bed. Inspect the sliced camera plateau, button edges, and thin features; choose supports and layer height for your printer and material.
+3. Remove first-layer flare only at the internal mating edges. Do not sand the exterior until a case fits; that destroys its value as a gauge.
+4. Dry-fit the dowels and bring the faces fully together. Measure width away from buttons, length, body thickness away from cameras, and overall camera height. The targets are 71.85, 150.01, 8.75, and the provisional 13.18 mm respectively.
+5. Measure a real phone's plateau footprint, blend, rim treatment, and camera height. Update the assumption table before approving tight clearances there. Compare button and opening positions too.
+6. Record print deviations. A too-small dummy can make a bad case look successful. Use a real device for the final fit check, including insertion/removal and button travel.
+
+No uniform scale factor is baked into the model. Printer compensation and case clearance are separate decisions. Expanding the dummy globally would also move the camera and button centers.
+
+## Remaining modeling limitations
+
+The piecewise Bézier contour keeps each segment inside its control polygon.
+That bounds the authored corner, but does not reconstruct missing surface data.
+Likewise, `Smith.from_result/1` reduces repeated evaluation; it does not change
+the geometry or the strength of a check.
+
+Two capabilities would simplify a future revision:
+
+- **Planar outline offset with loftable results.** `Smith.offset/3` moves surfaces
+  in 3D; it does not inset a sketch outline within its plane. A true 2D offset
+  would replace this lesson's corner-shrink convention.
+- **Loft boundary and continuity controls.** Tangent conditions and section
+  correspondence controls would help constrain the edge roll and plateau blend.
+  The current smooth interpolation can overshoot between sections.
+
+These are future modeling capabilities, not features promised by 0.2. Even with
+them, an exact replica would require complete surface definitions or authoritative
+3D geometry. The failed section check in step 5 remains part of this study.
+
+## Try a change
+
+Replace one plateau section after measuring your phone and rerun from that cell. The camera locations, buttons, and port datums stay fixed. Then change the pin clearance and rerun only the print preparation. Finally, build a short case-band coupon around a straight part of the body and compare the printed fit to the real device before designing an entire case.

@@ -1,6 +1,8 @@
 # Getting started
 
 Smith turns Elixir values into precise geometry and printable files. Start with a small script, then extract named functions as the design grows.
+If CAD is new to you, keep [CAD concepts](cad-basics.md) open alongside this guide.
+The examples use millimeters and run in document order.
 
 ## Install the native toolkit
 
@@ -13,10 +15,10 @@ The OCCT libraries must remain installed after compilation. A successful Mix dep
 For a standalone file:
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}])
+Mix.install([{:smith, "~> 0.2.0"}])
 ```
 
-For an existing Mix application, add `{:smith, "~> 0.1.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. There is no Smith application process or supervision tree to configure.
+For an existing Mix application, add `{:smith, "~> 0.2.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. There is no Smith application process or supervision tree to configure.
 
 ## Define a reusable part
 
@@ -25,8 +27,7 @@ defmodule Mount do
   alias Smith.Sketch
 
   def build(width \\ 60, depth \\ 40, thickness \\ 5) do
-    Sketch.rectangle(width, depth)
-    |> Sketch.fillet(radius: 2)
+    Sketch.rounded_rectangle(width, depth, 2)
     |> Sketch.cut(mounting_holes(width))
     |> Smith.extrude(thickness)
   end
@@ -62,12 +63,15 @@ Use a struct for parameters when a design has many dimensions; pass it to featur
 
 Bare sketches evaluate to faces, which can be inspected with `OCEx.area/1`. Extrude, revolve, loft, or sweep before printable export. A model recipe may also describe an edge or an empty compound; successful evaluation does not necessarily mean a printable solid.
 
-## Inspect and export
+## Check the result
 
 ```elixir
-{:ok, volume} = OCEx.volume(part.shape)
-{:ok, bounds} = OCEx.bounds(part.shape)
-{:ok, solids} = OCEx.solids(part.shape)
+{:ok, width} = Smith.Measure.extent(part, :x)
+{:ok, report} = Smith.Inspection.run(%{mount: part}, checks: [
+  {:measurement, :mount, width, expected: 60, tolerance: 1.0e-6},
+  {:topology, :mount, :solids, expected: 1}
+])
+:passed = report.status
 ```
 
 <div class="smith-doc-preview" data-preview="getting-started-2-part" data-model="part" data-label="Measured part">
@@ -77,3 +81,12 @@ Bare sketches evaluate to faces, which can be inspected with `OCEx.area/1`. Extr
 Queries return tagged results. Dimensions use millimeters, volumes cubic millimeters, and modeling angles degrees. Meshing angles use radians. Start with verified export defaults, then adjust mesh tolerances when necessary; see [Exporting](exporting.md).
 
 Open the [Livebook guide](livebook.md) to see stages while editing. Native geometry and printable exports also work in a terminal without a browser.
+
+
+## Continue learning
+
+For an interactive start, open [A plate, step by step](../examples/plate.livemd).
+For scripts, continue with [functions and pipelines](modeling.md), then
+[workplanes and sketches](sketches.md). The [Livebook catalog](livebook.md#choose-a-lesson)
+orders all lessons by topic and complexity. Read [inspection](inspection.md)
+and [exporting](exporting.md) before relying on a part's dimensions or print files.

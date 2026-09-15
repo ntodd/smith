@@ -2,7 +2,9 @@
 
 An attachment frame defines where a member connects. A connection moves one
 member to another frame and applies explicit motion coordinates. These are
-ordinary deferred recipe operations; geometry changes at `Smith.evaluate/1`.
+ordinary deferred recipe operations; member placement is resolved at `Smith.evaluate/1`.
+Read [assemblies](assemblies.md) first. A frame has an origin and three axes;
+a revolute connection turns around one of those axes, like a hinge.
 
 ## Attach a rotating arm
 
@@ -122,6 +124,6 @@ infer mating faces, detect collisions, model loads, or check travel clearance.
 Use geometric measurements and intersections appropriate to the design. Printable
 mesh and STEP checks still run at export, but they do not prove mechanical fit.
 
-The [joint Livebook](https://github.com/ntodd/smith/blob/main/examples/joints.livemd)
+The [joint Livebook](../examples/joints.livemd)
 shows several hinge poses, all five motion types, attachment-frame inspection,
-a vertical-gap check, and verified printable exports.
+a material-clearance check, and verified printable exports.

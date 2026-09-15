@@ -1,8 +1,16 @@
 # A plate, step by step
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
+
+## First lesson
+
+Build one plate, round its corners, drill a hole, and export it. No CAD background is assumed; the [CAD concepts guide](https://hexdocs.pm/smith/cad-basics.html) explains the terms.
+
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Start with a blank
 
@@ -15,6 +23,9 @@ Smith.Kino.render(blank, label: "1 · Blank")
 ```
 
 ## Round the corners
+
+A fillet replaces a sharp edge with a rounded transition. Rounding the four
+vertical edges changes the plate's footprint while keeping its top and bottom flat.
 
 Select the four vertical edges with a reusable query. Smith resolves the query
 against the body at this step; `count:` catches an unintended selection if you
@@ -29,7 +40,9 @@ Smith.Kino.render(rounded, label: "2 · Rounded corners")
 
 ## Drill the plate
 
-The top-face shortcut places the hole at that face's area centroid.
+The top-face shortcut places the hole at the face's area-weighted center. This
+plate is symmetric, so that is its geometric center. For a fixed pattern of
+holes, use an explicit plane as in [mechanical parts](mechanical-parts.livemd).
 
 ```elixir
 finished = rounded |> Smith.hole(on: :top, diameter: 8, through: :all)

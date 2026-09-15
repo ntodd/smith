@@ -10,26 +10,40 @@ defmodule Smith.Kino do
   Livebook's asset and data integration; OCEx supplies the mesh. Rendering
   does not use a CDN or a server-side graphics process.
 
-  Previews support rotation, zoom, fullscreen, and PNG download. They show
-  one surface color and do not provide part selection, dimensions, or
-  automatic exploded assembly views. Use `Smith.Assembly.view/2` to create a
+  Previews support named orthographic views, rotation, zoom, edges, clipping,
+  fullscreen, and PNG download. Colored layers can show modeling differences.
+  They do not provide part selection, dimension editing, or automatic exploded
+  assembly views. Use `Smith.Assembly.view/2` to create a
   display or exploded snapshot before rendering. See the [Livebook guide](livebook.html)
-  for stage-by-stage examples and local dependency setup.
+  for stage-by-stage examples and notebook setup.
   """
 
   @doc """
   Creates an interactive preview and returns the Kino directly.
 
-  Accepts a model, sketch, path, assembly, evaluated result, or `{:ok, result}`
+  Accepts a model, sketch, path, assembly, native shape, evaluated result, or `{:ok, result}`
   from `Smith.evaluate/1` or `Smith.Assembly.view/2`. Recipes are
   evaluated on each call; passing an existing result skips that step.
   The shape is then meshed into a snapshot. Assemblies show installed
   manufactured parts only. Sketches show their faces; paths and edge-only
   recipes show sampled curves. A mixed shape with faces displays its surfaces.
 
-  ## Options
+  A `Smith.Drawing` (or `{:ok, drawing}`) produces a responsive 2D SVG preview
+  with fullscreen and SVG download. The drawing fills the available width;
+  its exported millimeter dimensions remain unchanged. Drawings accept `:label`
+  and the options of `Smith.Drawing.svg/2`. Choose their plane with
+  `Smith.Drawing.new/2`; 3D camera, edge, and clipping options do not apply.
+
+  ## Options for 3D previews
 
     * `:label` — toolbar text, default `"Smith preview"`.
+    * `:view` — initial orthographic view: `:isometric` (default), `:top`,
+      `:bottom`, `:front`, `:back`, `:left`, or `:right`. Top looks from +Z,
+      front from −Y, and right from +X, matching `Smith.Render`.
+    * `:edges` — show sampled native edges initially, default false.
+    * `:clip` — `{Smith.Plane.t(), :positive | :negative}` to retain one side
+      visually. This clips the preview without capping or modifying geometry.
+      Use `Smith.section/2` for a measured cross-section.
     * `:tolerance` — linear mesh deflection in mm, default 0.03.
     * `:angular_tolerance` — angular mesh deflection in radians, default 0.5.
 
@@ -40,6 +54,12 @@ defmodule Smith.Kino do
   as operation and step. To handle modeling failures yourself, match on
   `Smith.evaluate/1` before rendering. The preview does not run the print
   export checks.
+
+  A list of `{source, {red, green, blue}}` layers creates a colored scene;
+  RGB channels are integers from 0 through 255. This is useful for rendering
+  the added and removed results of `Smith.Inspection.compare/2`. Layers are
+  opaque. Toolbar controls select views, show edges, and move axis-aligned
+  clipping planes. A supplied arbitrary clipping plane is also supported.
 
   ## Display in Livebook
 
@@ -78,7 +98,11 @@ defmodule Smith.Kino do
   previously compiled without Kino.
   """
   @spec render(
-          Smith.Model.t()
+          OCEx.Shape.t()
+          | [{Smith.Measure.source(), Smith.Render.color()}]
+          | Smith.Drawing.t()
+          | {:ok, Smith.Drawing.t()}
+          | Smith.Model.t()
           | Smith.Path.t()
           | Smith.Sketch.t()
           | Smith.Assembly.t()
@@ -96,6 +120,41 @@ defmodule Smith.Kino do
     end
   end
 
+  defp preview({:ok, %Smith.Drawing{} = drawing}, opts), do: preview(drawing, opts)
+
+  defp preview(%Smith.Drawing{} = drawing, opts) do
+    with :ok <- available(),
+         true <-
+           Smith.Geometry.options(opts, [
+             :label,
+             :hidden,
+             :tolerance,
+             :angular_tolerance,
+             :padding,
+             :stroke_width,
+             :title
+           ]) and is_binary(Keyword.get(opts, :label, "Smith drawing")),
+         {:ok, svg} <- Smith.Drawing.svg(drawing, Keyword.delete(opts, :label)) do
+      apply(Smith.Kino.Renderer, :new, [
+        %{
+          svg: svg,
+          label: Keyword.get(opts, :label, "Smith drawing"),
+          revision: drawing.source_revision
+        }
+      ])
+    else
+      false -> {:error, :invalid_options}
+      error -> error
+    end
+  end
+
+  defp preview(layers, opts) when is_list(layers) do
+    with :ok <- available(),
+         :ok <- options(opts),
+         {:ok, data} <- Smith.Kino.Data.build_layers(layers, opts),
+         do: apply(Smith.Kino.Renderer, :new, [data])
+  end
+
   defp preview(model, opts) do
     with :ok <- available(),
          :ok <- options(opts),
@@ -109,6 +168,8 @@ defmodule Smith.Kino do
     if Code.ensure_loaded?(Smith.Kino.Renderer), do: :ok, else: {:error, :kino_not_available}
   end
 
+  defp result(%OCEx.Shape{} = shape), do: Smith.Geometry.snapshot(shape)
+  defp result({:ok, %OCEx.Shape{} = shape}), do: Smith.Geometry.snapshot(shape)
   defp result({:ok, %Smith.Result{} = result}), do: {:ok, result}
   defp result({:ok, %Smith.Assembly.Result{} = result}), do: {:ok, result}
   defp result({:error, _} = error), do: error
@@ -123,6 +184,15 @@ defmodule Smith.Kino do
         Enum.all?(opts, fn
           {:label, value} ->
             is_binary(value)
+
+          {:view, value} ->
+            value in [:isometric, :top, :bottom, :front, :back, :left, :right]
+
+          {:edges, value} ->
+            is_boolean(value)
+
+          {:clip, {%Smith.Plane{} = plane, keep}} ->
+            keep in [:positive, :negative] and match?({:ok, _}, Smith.Plane.frame(plane))
 
           {key, value} when key in [:tolerance, :angular_tolerance] ->
             is_number(value) and value > 0

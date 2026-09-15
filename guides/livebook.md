@@ -1,48 +1,36 @@
 # Modeling in Livebook
 
-Livebook makes a model a sequence of executable, editable steps. Keep each stage
-in its own variable and display it with `Smith.Kino.render/2`. Earlier stages stay
-available for comparison and reuse. Changing a parameter and reevaluating dependent
-cells rebuilds the geometry using native OCEx operations.
+Livebook lets you edit a model one stage at a time and inspect each result.
+This guide covers setup and previews. The lessons below teach modeling; you do
+not need to read every feature guide before starting the first one.
 
 ## Setup
 
-Install [Livebook](https://livebook.dev/) and the pinned toolkit described in the
-[OCEx installation guide](https://hexdocs.pm/ocex/installation.html). The Elixir
-runtime evaluating the notebook needs OCCT, a compiler, and its headers. Installing
-OCCT on your laptop does not install it in a remote or container runtime.
-
-In the notebook's setup cell:
+Install Livebook and the toolkit described in the
+[OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
+The runtime executing the notebook needs the toolkit, compiler, and OTP headers.
+For a remote runtime, install them on that machine.
 
 ```elixir
-Mix.install([
-  {:smith, "~> 0.1.0"},
-  {:kino, "~> 0.19.0"}
-])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
-Smith brings in OCEx as a Hex dependency; no sibling checkout or dependency
-override is needed.
+Run this in the setup cell. Smith brings OCEx in as a dependency. Kino provides
+Livebook outputs; ordinary modeling scripts do not need it. After changing
+native code or dependencies, restart the runtime and reevaluate setup. When
+compilation fails, read the native error above Mix's dependency summary. The
+installation guide covers missing tools, headers, and Xcode license acceptance.
 
-OCEx discovers Homebrew CMake even when the Livebook desktop runtime omits it from
-`PATH`. If dependency compilation already failed, restart the runtime and run setup
-again.
-
-Kino is optional. Ordinary scripts and applications need only Smith. If adding
-Kino to an already compiled application, recompile Smith to enable the renderer.
-Without it, `Smith.Kino.render/2` raises with reason `:kino_not_available`. For a
-notebook previously compiled without Kino, restart its runtime and use
-`Mix.install(deps, force: true)` once, then remove `force: true` for normal use.
-
-The previews on this page use the same renderer as Livebook. Their meshes are
-built from the guide's examples when the documentation is generated. You can
-inspect them here without installing Elixir; open the notebook to edit a recipe
-and rebuild its geometry.
+If the runtime already compiled Smith without Kino, rebuild once with
+`Mix.install(deps, force: true)`, then remove `force: true` for normal use.
+The release notebooks use Hex dependencies; local development can replace Smith
+with a path dependency and add a local OCEx override in setup.
 
 ## Show each stage
 
-Use separate cells for these steps. `render/2` returns the Kino directly, so the
-render call can be the final expression in each cell:
+Put each block in its own cell. Recipes are ordinary Elixir values, and each
+operation returns a new one. A fillet rounds edges; a hole removes material.
+See [CAD concepts](cad-basics.md) for unfamiliar terms.
 
 ```elixir
 blank = Smith.box(60, 40, 5)
@@ -50,16 +38,16 @@ Smith.Kino.render(blank, label: "1 · Blank")
 ```
 
 <div class="smith-doc-preview" data-preview="plate-blank" data-model="blank" data-label="Blank">
-<p>Interactive 3D preview available in HexDocs.</p>
+<p>Interactive preview available in HexDocs.</p>
 </div>
 
 ```elixir
-rounded = blank |> Smith.fillet(edges: {:parallel, :z}, radius: 2)
+rounded = blank |> Smith.fillet(edges: {:parallel, :z}, count: 4, radius: 2)
 Smith.Kino.render(rounded, label: "2 · Rounded corners")
 ```
 
 <div class="smith-doc-preview" data-preview="plate-rounded" data-model="rounded" data-label="Rounded corners">
-<p>Interactive 3D preview available in HexDocs.</p>
+<p>Interactive preview available in HexDocs.</p>
 </div>
 
 ```elixir
@@ -69,89 +57,129 @@ Smith.Kino.render(result, label: "3 · Drilled plate")
 ```
 
 <div class="smith-doc-preview" data-preview="plate-drilled" data-model="result" data-label="Drilled plate">
-<p>Interactive 3D preview available in HexDocs.</p>
-</div>
-
-Drag to rotate and scroll to zoom. **Fullscreen** expands the preview to the screen
-while retaining the current camera and controls. Choose **Exit fullscreen** or press
-**Esc** to return to the notebook. The canvas resizes with the available space;
-**Download PNG** saves the view at its current canvas resolution. **Reset view**
-restores the initial camera. Fullscreen requires browser/iframe support; the
-button is disabled when unavailable, and a denied request displays a message. Geometry and the renderer's JavaScript are sent
-to your browser through Livebook. Rendering uses WebGL with no external CDN,
-Python process, or graphics server. Every preview includes its geometry revision.
-
-`render/2` accepts a recipe, sketch, assembly, or evaluated result. It also accepts
-`{:ok, result}`, so evaluation and assembly views can pipe directly into it:
-
-```elixir
-finished
-|> Smith.evaluate()
-|> Smith.Kino.render(label: "Finished plate")
-```
-
-<div class="smith-doc-preview" data-preview="livebook-4-finished" data-model="finished" data-label="Piped evaluation">
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-Passing an existing result avoids reevaluating the recipe. Preview failures raise
-`RuntimeError` with the reason, including the operation and step for modeling
-failures. A piped `{:error, reason}` raises the same error. Match on
-`Smith.evaluate/1` before rendering when you need to handle a failure yourself.
+`render/2` returns the Kino directly, so leave it as the cell's final expression.
+It accepts recipes, sketches, paths, native shapes, assemblies, evaluated results,
+and tagged `{:ok, result}` values. For example,
+`finished |> Smith.evaluate() |> Smith.Kino.render()` displays the result.
+Match on evaluation first when you also need the result for measurements or export.
+Rendering errors raise with the failed operation and reason.
 
-The default mesh uses 0.03 mm
-linear and 0.5 rad angular deflection. Large meshes increase notebook transfer and
-browser memory use; raise `tolerance:` for a lighter preview. Camera position is
-local to each output and resets when that cell is reevaluated. Assembly
-`display_offset:` and `exploded_offset:` do not move a direct assembly preview.
-Use `Smith.Assembly.view(result, :display)` or `:exploded` to create a snapshot
-with these offsets applied, then pass that result to `Smith.Kino.render/2`.
+## Inspect the preview
+
+Drag to orbit and scroll to zoom. **View** chooses a standard orthographic view;
+**Edges** shows native boundaries. **Clipping plane** and its slider reveal
+interior surfaces without modifying or capping geometry. Use `Smith.section/2`
+when you need an actual measurable cross-section.
+
+**Fullscreen** expands the output; **Esc** returns to the notebook. **Download
+PNG** saves the current 3D view. Camera and clipping state belong to each output
+and reset when it is replaced. The renderer uses WebGL in your browser; no
+separate graphics server is needed.
+
+Set the initial view explicitly when it helps explain a feature:
+
+```elixir
+Smith.Kino.render(result, label: "Hole from above", view: :top, edges: true)
+```
+
+<div class="smith-doc-preview" data-preview="livebook-4-finished" data-model="result" data-label="Hole from above">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+Top looks from +Z, front from −Y, and right from +X. These are world directions;
+Smith does not infer the front of a product. The default preview mesh uses
+0.03 mm linear and 0.5 rad angular deflection. Larger `tolerance:` values can
+make large previews lighter without changing the native geometry.
+
+## Reuse an evaluated stage
+
+Rendering a recipe evaluates it. Evaluating the same recipe again repeats that
+work. When an expensive stage feeds several operations, keep its result and
+branch with `Smith.from_result/1`:
+
+```elixir
+blank_snapshot = Smith.from_result(result)
+upper = Smith.split(blank_snapshot, Smith.Plane.xy(z: 2.5), keep: :positive)
+Smith.Kino.render(upper, label: "Upper half from the existing geometry")
+```
+
+<div class="smith-doc-preview" data-preview="evaluated-branch" data-model="upper" data-label="Branch from an evaluated plate">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+Keep the original recipe as the editable source. A snapshot holds native geometry
+in this runtime; it does not update itself or survive a runtime restart. After
+editing upstream parameters, reevaluate the affected cells in order.
+
+## Drawings and colored stages
+
+Drawings use the same render entrypoint. They fill the output area and provide
+fullscreen and SVG download; screen sizing does not alter exported millimeters.
+
+```elixir
+{:ok, width} = Smith.Measure.extent(result, :x)
+{:ok, drawing} = Smith.Drawing.new(result, on: :xy)
+{:ok, drawing} = Smith.Drawing.dimension(drawing, width, orientation: :horizontal, offset: -8)
+Smith.Kino.render(drawing, label: "Measured plate", hidden: false)
+```
+
+<div class="smith-doc-preview" data-preview="livebook-measured-plate" data-model="drawing" data-label="Measured plate">
+<p>Dimensioned drawing available in HexDocs.</p>
+</div>
+
+For a colored 3D scene, pass `[{source, {red, green, blue}}, ...]`. The
+[inspection lesson](../examples/inspection.livemd) uses this to distinguish
+added and removed material. Layers are opaque; orbit or clip to see hidden areas.
+These colors are presentation choices, not assembly material assignments.
 
 ## Assemblies and files
 
-An assembly preview shows installed manufactured parts. Fetch a member with
-`Smith.Assembly.fetch/2` to inspect a reference or a printable extra individually.
-The initial preview has one surface color; it does not offer part selection,
-dimensions or material rendering. Exploded placement comes from `Smith.Assembly.view/2`;
-export the original assembly result to preserve its installed and print placements.
-
-To generate printable files, export the evaluated result:
+A direct assembly preview shows installed manufactured parts. Fetch a reference
+with `Smith.Assembly.fetch/2` to include it in a colored scene. For display offsets
+or an exploded arrangement, pass `Smith.Assembly.view(result, :display)` or
+`:exploded` into the renderer. Export the original assembly to retain its part
+names and print placements.
 
 ```elixir
 {:ok, files} = Smith.export(result, "output", name: "plate", on_bed: true)
-files
+files.three_mf
 ```
 
 <div class="smith-doc-preview" data-preview="livebook-5-result" data-model="result" data-label="Exported plate">
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-PNG is an illustration, not a fabrication file. Export produces verified STL and
-3MF geometry plus STEP and reports; see [exporting](exporting.md). Files are written
-on the machine running the notebook's Elixir runtime.
+Files are written on the runtime's machine. PNG and SVG show views; STL and 3MF
+contain printable geometry. See [exporting](exporting.md) for verification and
+print orientation.
 
-## Raspberry Pi enclosure walkthrough
+## Choose a lesson
 
-[Design a Raspberry Pi enclosure](../examples/raspberry-pi-enclosure.livemd)
-builds a complete mechanical assembly from reference geometry through printable
-exports. Follow the sliding tray, rotating latch, and curved duct through their
-construction stages, then inspect the installed and exploded poses. The notebook
-includes interference checks, drawings, and a rail fit test. It assumes Smith is
-installed and concentrates on modeling decisions.
+The notebooks are included in the Hex package's `examples/` directory and shown
+in HexDocs. Open their `.livemd` source in Livebook to edit and run the cells.
+Within each group, the order below moves from simpler concepts to larger models.
 
-## Runnable notebooks
+| Level | Notebook | What you will learn |
+| --- | --- | --- |
+| Start | [A plate](../examples/plate.livemd) | Build, round, drill, measure, export |
+| Start | [Sketches and solid forms](../examples/profiles.livemd) | Extrude a ring, revolve a sleeve, join sections |
+| Start | [Mechanical parts](../examples/mechanical-parts.livemd) | Slots, fastener recesses, selectors, mirrored parts |
+| Inspect | [Inspection](../examples/inspection.livemd) | Measure, detect a failed requirement, compare stages |
+| Inspect | [Drawings](../examples/drawings.livemd) | Views, hidden features, measured SVG dimensions |
+| Shape | [Extrusion](../examples/extrusion.livemd) | Symmetric depth, tapered walls, tilted end planes |
+| Shape | [Paths, lofts, and shells](../examples/paths-and-shells.livemd) | A tray, a swept bend, a smooth transition |
+| Shape | [Forming and cutting](../examples/forming.livemd) | Draft, split, section, surface offset, thickening |
+| Shape | [Projection](../examples/projection.livemd) | Transfer outlines onto flat and curved surfaces |
+| Assemble | [Named parts](../examples/assembly.livemd) | Reusable feet, references, placements, print packs |
+| Assemble | [Nested assemblies](../examples/nested-assemblies.livemd) | Repeated modules and member paths |
+| Assemble | [Joints](../examples/joints.livemd) | A pivoting arm and checks across poses |
+| Project | [Raspberry Pi enclosure](../examples/raspberry-pi-enclosure.livemd) | Integrate parts, fits, motion, and printable exports |
+| Advanced study | [Phone fit dummy](../examples/iphone-17-pro.livemd) | Interpret a drawing, bound curves, expose model limitations |
 
-Download or open these from the repository in Livebook:
-
-- [A plate, step by step](https://github.com/ntodd/smith/blob/main/examples/plate.livemd)
-- [Selectors, sweeps, smooth lofts, and shelling](https://github.com/ntodd/smith/blob/main/examples/paths-and-shells.livemd)
-- [Sketches, revolve, and loft](https://github.com/ntodd/smith/blob/main/examples/profiles.livemd)
-- [Draft, split, section, offset, and thickening](https://github.com/ntodd/smith/blob/main/examples/forming.livemd)
-- [Attachment frames and joint poses](https://github.com/ntodd/smith/blob/main/examples/joints.livemd)
-- [Reusable nested assemblies](https://github.com/ntodd/smith/blob/main/examples/nested-assemblies.livemd)
-- [A named assembly and print pack](https://github.com/ntodd/smith/blob/main/examples/assembly.livemd)
-
-The notebooks are also included under `examples/` in the Hex package. Their setup
-cells install Smith and Kino from Hex.
-
-The [mechanical parts notebook](https://github.com/ntodd/smith/blob/v0.1.0/examples/mechanical-parts.livemd) builds a slotted plate in stages, adds blind and recessed holes, inspects selections, mirrors the result, and exports the parts with a torus and sphere.
+The enclosure is the complete design walkthrough. The phone is an advanced
+study with an unresolved edge-roll defect and incompletely specified camera
+surfaces; it is not yet an accurate case-fit reference. Both distinguish model
+checks from physical print testing.

@@ -130,9 +130,9 @@ defmodule Smith.Sketch do
   def polygon(points, opts \\ []), do: %__MODULE__{kind: :polygon, data: points, options: opts}
 
   @doc """
-  Describes a closed outline made from local lines, circular arcs, and interpolated splines.
+  Describes a closed outline made from local lines, circular arcs, Bézier curves, and interpolated splines.
 
-  Supply a nonempty list of `line/2`, `arc/4`, and `spline/2` descriptions in connected
+  Supply a nonempty list of `line/2`, `arc/4`, `bezier/1`, and `spline/2` descriptions in connected
   boundary order. Options are `:on` and `:at` as in `rectangle/3`.
   Coordinates are retained and shifted by `:at`; `:align` is not accepted.
   Open, disconnected, and invalid boundaries fail during evaluation.
@@ -177,6 +177,23 @@ defmodule Smith.Sketch do
   """
   @spec arc({number(), number()}, number(), number(), number()) :: tuple()
   def arc(center, radius, start, sweep), do: {:arc, center, radius, start, sweep}
+
+  @doc """
+  Returns a local polynomial Bézier segment for `profile/2`.
+
+  Supply 2–26 `{u, v}` control points in traversal order. The first and
+  last are endpoints. The others steer the curve; it does not generally
+  pass through them. A cubic uses four points. Keeping all control points
+  in a region keeps the curve in their convex hull.
+
+  The profile's plane maps every control point into world coordinates.
+  Validation happens when the profile is evaluated. Malformed 2D points
+  return `:invalid_profile`; native count and collapsed-curve errors return
+  `:invalid_argument`, wrapped in the enclosing modeling step.
+  Close the profile with other segments before extruding it.
+  """
+  @spec bezier([{number(), number()}]) :: tuple()
+  def bezier(points), do: {:bezier, points}
 
   @doc """
   Returns a nonperiodic interpolated B-spline description for `profile/2`.
@@ -537,6 +554,14 @@ defmodule Smith.Sketch do
       else: {:error, :invalid_profile}
   end
 
+  defp edge({:bezier, points}, frame) do
+    with true <- bezier_points?(points) do
+      OCEx.bezier(Enum.map(points, &Plane.point(frame, &1)))
+    else
+      _ -> {:error, :invalid_profile}
+    end
+  end
+
   defp edge({:spline, points, tangents}, frame) do
     with true <- is_list(points) and Enum.all?(points, &point?/1),
          {:ok, tangents} <- spline_tangents(tangents, frame) do
@@ -548,6 +573,10 @@ defmodule Smith.Sketch do
   end
 
   defp edge(_, _), do: {:error, :invalid_profile}
+
+  defp bezier_points?([]), do: true
+  defp bezier_points?([point | rest]), do: point?(point) and bezier_points?(rest)
+  defp bezier_points?(_), do: false
 
   defp spline_tangents(nil, _), do: {:ok, nil}
 

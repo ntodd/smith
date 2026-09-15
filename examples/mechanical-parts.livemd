@@ -1,14 +1,16 @@
-# Smith — Mechanical parts
+# Mechanical parts
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing dependencies or native code.
+After [sketches and solid forms](profiles.livemd), build a mounting plate and its mirrored partner. Add slots and three types of screw or locating holes, then inspect the selected features.
 
-This notebook builds a mounting plate, adds a slot and fastener features, and creates a mirrored partner. All dimensions are millimeters. Each 3D preview supports rotation, zoom, fullscreen, and PNG download. Cells retain ordinary immutable recipes, so earlier stages remain available as you refine the design.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Round the outline
 
@@ -101,24 +103,20 @@ Use `Selector.any_of([a, b])` to retain either query's matches, or `Selector.exc
 The plane at X=40 reflects the plate into a separate part at X=80. Mirroring returns just that reflected recipe; the original remains reusable. Finishing operations can follow a mirror because the reflected solid retains outward orientation.
 
 ```elixir
-partner = Smith.mirror(plate, Plane.yz(x: 40))
+partner = part |> Smith.from_result() |> Smith.mirror(Plane.yz(x: 40))
 Smith.Kino.render(partner, label: "5 · Mirrored partner")
 ```
 
 ## Assemble and preview the finished parts
 
-A torus and sphere demonstrate the new centered solid primitives alongside the two plates. The torus major radius reaches its tube center; the minor radius measures the tube itself. They are separate sample parts, not attached to the plates. Print placement belongs to each assembly member.
+The two plates remain independent parts. Their installed positions show the
+mirrored arrangement; print placement centers each part on the bed.
 
 ```elixir
-ring = Smith.torus(10, 2, align: {:center, :center, :min})
-ball = Smith.sphere(3, align: {:center, :center, :min})
-
 assembly =
   Assembly.new(:mechanical_parts)
-  |> Assembly.part(:left, plate, print: [on_bed: true])
+  |> Assembly.part(:left, Smith.from_result(part), print: [on_bed: true])
   |> Assembly.part(:right, partner, print: [on_bed: true])
-  |> Assembly.part(:ring, ring, position: {40, 35, 0}, print: [on_bed: true])
-  |> Assembly.part(:ball, ball, position: {40, -30, 0}, print: [on_bed: true])
 
 {:ok, assembled} = Smith.evaluate(assembly)
 Smith.Kino.render(assembled, label: "6 · Mechanical sample parts")
@@ -134,6 +132,6 @@ Export writes verified STL and 3MF for each manufactured part, the installed ass
 files.print_pack
 ```
 
-The formulas above check material volume, and export checks mesh connectivity/winding and STEP volume agreement. These checks do not establish strength, fit, or a print strategy. Inspect the blind floor and countersink walls in your slicer. The sphere and torus may need supports or a different manufacturing approach.
+The formulas above check material volume, and export checks mesh connectivity/winding and STEP volume agreement. These checks do not establish strength, fit, or a print strategy. Inspect the blind floor and countersink walls in your slicer.
 
 Try changing a hole's depth, moving the entry plane to a side face, or selecting circular rims by radius. Keep the volume formulas consistent with dimensional changes. Giving both `depth:` and `through:` must fail rather than silently choosing one.
