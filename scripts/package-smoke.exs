@@ -1,5 +1,5 @@
 # This file is copied out of the repository and run against archive-installed deps.
-Mix.install([{:smith, "~> 0.1.0"}])
+Mix.install([{:smith, "~> 0.2.0"}])
 
 false = Code.ensure_loaded?(Kino)
 true = Code.ensure_loaded?(Smith.Kino)
@@ -145,3 +145,29 @@ true = svg =~ "<svg"
 {:ok, dxf} = Smith.Drawing.dxf(drawing)
 true = dxf =~ "$INSUNITS"
 IO.puts("Verified archive-installed SVG and DXF drawing export")
+
+arch = Sketch.profile([
+  Sketch.bezier([{0, 0}, {1, 2}, {2, 0}]), Sketch.line({2, 0}, {0, 0})
+])
+{:ok, part} = arch |> Smith.extrude(3) |> Smith.evaluate()
+{:ok, volume} = OCEx.volume(part.shape)
+true = abs(volume - 4) < 1.0e-8
+{:ok, files} = Smith.export(part, "output", name: "bezier-arch", on_bed: true, tolerance: 0.001, angular_tolerance: 0.1)
+true = files.verification.mesh.watertight and files.verification.mesh.winding_consistent
+IO.puts("Verified archive-installed Bezier sketch and printable export")
+
+# Agent inspection must work with Kino absent and only packaged dependencies.
+{:ok, inspected} = Smith.box(20, 10, 4) |> Smith.evaluate()
+{:ok, width} = Smith.Measure.extent(inspected, :x)
+{:ok, report} = Smith.Inspection.run(%{part: inspected}, checks: [
+  {:measurement, :part, width, expected: 20, tolerance: 1.0e-6},
+  {:topology, :part, :solids, expected: 1}
+])
+:passed = report.status
+{:ok, artifacts} = Smith.Inspection.write(report, "inspection", views: [:top, :front], width: 96, height: 96)
+true = File.exists?(artifacts.report)
+{:ok, drawing} = Smith.Drawing.new(inspected)
+{:ok, drawing} = Smith.Drawing.dimension(drawing, width, orientation: :horizontal)
+{:ok, svg} = Smith.Drawing.svg(drawing)
+true = String.contains?(svg, "20.00 mm")
+IO.puts("Verified archive-installed text-only inspection, headless PNGs, and measured drawings without Kino")

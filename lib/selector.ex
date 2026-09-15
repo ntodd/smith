@@ -383,7 +383,7 @@ defmodule Smith.Selector do
   defp filter([], {:extreme, _, _}), do: {:ok, []}
 
   defp filter(candidates, {:extreme, axis, order}) do
-    coordinate = fn {_, info} -> elem(Map.get(info, :center, info[:midpoint]), index(axis)) end
+    coordinate = fn {_, info} -> elem(info[:midpoint] || info[:center], index(axis)) end
     values = Enum.map(candidates, coordinate)
     limit = if order == :max, do: Enum.max(values), else: Enum.min(values)
     {:ok, Enum.filter(candidates, &(abs(coordinate.(&1) - limit) <= 1.0e-7))}
@@ -425,7 +425,7 @@ defmodule Smith.Selector do
     do: info.normal != nil and sign * elem(info.normal, index(axis)) > 1 - 1.0e-9
 
   defp value(info, axis) when axis in [:x, :y, :z],
-    do: elem(Map.get(info, :center, info[:midpoint]), index(axis))
+    do: elem(info[:midpoint] || info[:center], index(axis))
 
   defp value(info, property), do: Map.get(info, property)
 

@@ -2,11 +2,9 @@
 
 A reusable part usually needs a small set of deliberate dimensions: its outline, fastener locations, clearances, and placement. Keep those dimensions in ordinary Elixir values and functions. Smith recipes compose without evaluating intermediate bodies.
 
-## Outlines and solid primitives
+## A slotted mounting plate
 
 `Sketch.rounded_rectangle(width, height, radius)` rounds all four corners before applying cutouts. `Sketch.slot(length, width)` uses **overall length**, with semicircular ends of diameter `width`. Both use the same local `on:`, `at:`, and `align:` options as a rectangle. Equal slot length and width make a circle. A nonzero straight span must exceed the native 1.0e-7 mm edge tolerance.
-
-`Smith.sphere(radius)` and `Smith.torus(major_radius, minor_radius)` default to centered bounds on all three axes. The torus lies around world Z; its major radius reaches the tube center, and its minor radius is the tube radius. Both support the standard world `at:` and three-axis `align:` options. Rotate the result for a different orientation. Tori must have major radius greater than minor radius by more than 1.0e-7 mm.
 
 ```elixir
 alias Smith.{Plane, Selector, Sketch}
@@ -16,8 +14,6 @@ outline =
   |> Sketch.cut(Sketch.slot(20, 6))
 
 plate = Smith.extrude(outline, 8)
-ring = Smith.torus(10, 2, align: {:center, :center, :min})
-ball = Smith.sphere(3, at: {0, 0, 3})
 ```
 
 <div class="smith-doc-preview" data-preview="mechanical-parts-0-outline" data-model="outline" data-label="Slotted outline">
@@ -28,15 +24,11 @@ ball = Smith.sphere(3, at: {0, 0, 3})
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-<div class="smith-doc-preview" data-preview="mechanical-parts-0-ring" data-model="ring" data-label="Torus">
-<p>Interactive preview available in HexDocs.</p>
-</div>
-
-<div class="smith-doc-preview" data-preview="mechanical-parts-0-ball" data-model="ball" data-label="Sphere">
-<p>Interactive preview available in HexDocs.</p>
-</div>
-
 ## Holes and entry planes
+
+A counterbore is a flat-bottomed recess for a screw head. A countersink is a
+conical recess, commonly used for a flush screw. A blind hole stops inside the
+part; a through hole passes all the way through it.
 
 Every hole specifies a diameter and exactly one extent: `through: :all` or `depth: millimeters`. A blind hole starts at the entry plane, travels along its **negative normal**, and leaves a flat floor. If the plane is outside the body, part of the specified depth is spent reaching the surface. Through-all instead spans the body's projected bounds in both directions, regardless of where the plane lies.
 
@@ -76,6 +68,9 @@ plate =
 A pilot cut must remove material or evaluation fails with `:hole_misses_body`. Its recess must remove additional material or it fails with `:recess_misses_body`. Invalid extent/recess options return `:invalid_options`. Errors retain the feature name and recipe step in `Smith.Error`. These features specify geometry rather than a thread standard, drill-point angle, or automatic clearance allowance.
 
 ## Select, sort, and inspect
+
+Topology is the arrangement of faces and edges. Use geometry properties to select
+a feature rather than memorizing an edge index.
 
 Selector filters operate on the preceding selection. Length, radius, and area accept a numeric value or inclusive `{minimum, maximum}` range. The optional `tolerance:` defaults to 1.0e-7 in the property's units: mm for length/radius, mm² for area. Candidates with no reported radius do not match a radius filter.
 

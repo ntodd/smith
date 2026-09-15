@@ -1,18 +1,16 @@
-# Smith — Draw and export a mechanical part
+# Draw and export a mechanical part
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install the pinned native toolkit from the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
-Restart the Livebook runtime after updating native
-code. Dimensions are millimeters; modeling angles are degrees.
+After [mechanical parts](mechanical-parts.livemd), make orthographic views of a counterbored plate, inspect hidden holes, and add a measured dimension. Orthographic views have no perspective scaling.
 
-This notebook builds a plate, checks its volume, and renders three orthographic
-views. Drawing visibility comes from the BREP; SVG/DXF curves are sampled only
-when exported. The final files are written on the Livebook runtime's machine.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Build a counterbored plate
 
@@ -51,8 +49,7 @@ drawings = for {name, plane} <- planes do
   {name, drawing}
 end
 drawings |> Enum.map(fn {name, drawing} ->
-  {:ok, svg} = Drawing.svg(drawing, title: name, tolerance: 0.01)
-  Kino.Layout.grid([Kino.Markdown.new("**#{name}**"), Kino.Image.new(svg, :svg)])
+  Kino.Layout.grid([Kino.Markdown.new("**#{name}**"), Smith.Kino.render(drawing, label: name, tolerance: 0.01)])
 end) |> Kino.Layout.grid(columns: 3)
 ```
 
@@ -85,20 +82,37 @@ within a periodic surface are omitted in both cases.
 ```elixir
 {:ok, tangent_view} = Drawing.new(part, on: :xz, tangents: true)
 {:ok, clean_svg} = Drawing.svg(tangent_view, hidden: false, title: "Visible boundaries")
-Kino.Image.new(clean_svg, :svg)
+Smith.Kino.render(tangent_view, hidden: false, label: "Visible boundaries")
 ```
+
+## Add a measured width
+
+The label comes from evaluated geometry. `dimension/3` keeps the measurement tied
+to this revision, and `render/2` fits the SVG to the notebook area. Fullscreen makes
+small details readable; downloading the SVG preserves its millimeter units.
+
+```elixir
+{"Top", top} = List.keyfind(drawings, "Top", 0)
+{:ok, width} = Smith.Measure.extent(part, :x)
+{:ok, measured} = Drawing.dimension(top, width, orientation: :horizontal, offset: -8)
+Smith.Kino.render(measured, label: "Measured mounting plate", hidden: false)
+```
+
+<!-- <div class="smith-doc-preview" data-preview="drawing-book-measured" data-model="measured" data-label="Measured mounting plate"></div> -->
 
 ## Export views and printable geometry
 
 The drawing directory includes the source geometry revision. SVG uses polylines
 with physical mm dimensions and a margin; DXF uses LWPOLYLINE entities in mm on
-VISIBLE/HIDDEN layers. DXF keeps upward Y and has no SVG margin. Neither format
-creates dimensions, joined cutting contours, or toolpaths. Check scale in the
+VISIBLE/HIDDEN layers. DXF keeps upward Y and has no SVG margin. The unannotated views can be exchanged as SVG or DXF. Dimensions are exported
+separately as SVG; annotated DXF is not supported. Neither writer joins cutting
+contours or generates toolpaths. Check scale in the
 receiving application.
 
 ```elixir
 directory = Path.join("output/drawings", part.revision)
 File.mkdir_p!(directory)
+{:ok, _} = Drawing.write(measured, Path.join(directory, "measured.svg"), hidden: false)
 paths = for {name, drawing} <- drawings, extension <- ["svg", "dxf"] do
   path = Path.join(directory, String.downcase(name) <> "." <> extension)
   {:ok, ^path} = Drawing.write(drawing, path, tolerance: 0.01)

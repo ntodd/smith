@@ -1,6 +1,9 @@
 # Exporting printable models and assemblies
 
-Use `Smith.export/3` for verified print output. Use `Smith.export/2` only when you need a single raw STEP or STL file.
+Use `Smith.export/3` for verified print output.
+STL is a triangle mesh; 3MF also records units, while STEP retains native CAD
+geometry for exchange. A slicer turns STL or 3MF into printer instructions.
+Use the [inspection guide](inspection.md) to check design dimensions before export. Use `Smith.export/2` only when you need a single raw STEP or STL file.
 
 ## Verified part bundles
 

@@ -1,17 +1,5 @@
 # Errors, contracts, and limits
 
-Curve projection returns wires, clips to target surfaces, and retains multiple hits.
-Parallel projection is bidirectional; conical projection follows source half-rays.
-`face/1` fills only one closed planar wire; it does not infer holes or select hits.
-See [projection](projection.html) for source/target rules and examples.
-
-Extrusion supports signed or symmetric extent, tapered straight/circular walls,
-and straight extrusion up to an infinite plane. Symmetric distance applies to
-each side. Taper requires normal travel and cannot construct topology changes
-such as collapsed walls. Up-to-plane extrusion requires the entire profile to
-reach the plane ahead; it does not find the nearest face of a target body.
-See [extrusion](extrusion.html) for contracts and examples.
-
 Smith separates recipe construction from native evaluation. Construction is intended for typed Elixir values and records requested geometry without making native calls. Geometric and option validation runs when the recipe is evaluated.
 
 ## Handle evaluation results
@@ -50,7 +38,26 @@ OCEx performs CPU-bound work on dirty schedulers, with a mutex serializing nativ
 
 C++ exceptions are caught and translated. A native memory fault can still terminate the VM. Run experimental or untrusted modeling workloads in a separate OS process when isolation is required. NIF hot upgrade, hard cancellation, and external worker orchestration are not included.
 
+## Inspection and drawing failures
+
+`{:ok, report}` means an inspection report was produced. Check `report.status`:
+`:passed` meets the stated requirements, `:failed` does not, and `:error` means a
+check could not run. An empty section does not prove that the source has no
+material; verify the section plane and expected face count.
+
+Measurements require an unambiguous feature selection. Drawings reject
+measurements from another revision and dimensions distorted by projection.
+`Smith.Kino.render/2` raises on preview failure; match evaluation results before
+rendering when the notebook needs to recover from an error.
+
 ## Supported modeling scope
+
+- Extrusion supports signed or symmetric depth, tapered straight/circular walls,
+  and a stop at an infinite plane. Symmetric distance applies to each side;
+  up-to-plane extrusion does not search a target body's faces. See [extrusion](extrusion.md).
+- Projection transfers boundary curves onto surfaces and retains multiple hits.
+  Parallel projection is bidirectional; `face/1` fills only one closed planar
+  wire. It does not infer holes or choose a hit. See [projection](projection.md).
 
 - Sketches have one connected region; cutouts may create multiple inner loops. Sketch union/intersection, constraint solving, and face-attached planes are not implemented. Solid Boolean union and intersection are available through `Smith.fuse/2` and `Smith.common/2`.
 - Sketch fillets round the original convex outline before cuts; they do not round new cut corners.
@@ -63,7 +70,7 @@ C++ exceptions are caught and translated. A native memory fault can still termin
 - Mirror reflects about an explicit plane. Split keeps either or both solid sides of a plane; section returns filled planar faces, including holes. Neither operation performs projection.
 - Draft supports planar, cylindrical, and conical selected faces; tangent-connected faces may also change. Collapsing faces and topology transitions are not generally supported.
 - Offset follows surface normals in 3D, not a sketch outline within its plane. Thickening accepts faces and open shells. Compound members are processed independently, without fusion. Self-intersection repair is not enabled, and validity checks do not prove every self-intersection absent. See [forming and cutting](forming.md).
-- Orthographic drawings retain native visible/hidden curves. SVG/DXF export samples them into polylines in millimeters; it does not import drawings, join cutting contours, or generate dimensions. See [drawings](drawings.md).
+- Orthographic drawings retain native visible/hidden curves. SVG/DXF export samples them into polylines in millimeters; it does not import drawings, join cutting contours, or generate toolpaths. Measured SVG dimensions are supported; annotated DXF is not. See [drawings](drawings.md).
 - OCEx provides a curated native API rather than a class-by-class OCCT binding.
 
 These limits describe the supported public contract. Internal modules and functions marked with hidden documentation may change without compatibility guarantees.

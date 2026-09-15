@@ -1,8 +1,16 @@
-# Smith - A named assembly and print pack
+# A named assembly and print pack
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
+
+## Before you start
+
+After [mechanical parts](mechanical-parts.livemd), make two instances of a reusable foot and place reference hardware above them. An assembly keeps these parts separately named and printable.
+
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Define a reusable part
 
@@ -90,4 +98,4 @@ installed STEP geometry, a separate reference STEP, and a ZIP of printable parts
 files
 ```
 
-For a reusable group of parts, use `Assembly.subassembly/4`. The [nested assembly notebook](https://github.com/ntodd/smith/blob/main/examples/nested-assemblies.livemd) covers parent/child placement, path lookup, printable extras, and per-leaf exports.
+For a reusable group of parts, use `Assembly.subassembly/4`. The [nested assembly notebook](nested-assemblies.livemd) covers parent/child placement, path lookup, printable extras, and per-leaf exports.

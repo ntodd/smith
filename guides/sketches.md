@@ -1,6 +1,6 @@
 # Workplanes and sketches
 
-`Smith.Plane` defines a local coordinate frame. `Smith.Sketch` describes a connected 2D region in that frame, optionally with holes. Both are ordinary immutable Elixir values; construction performs no native operations. `Smith.extrude/2` turns a sketch into a normal Smith model recipe, ready for holes, booleans, fillets, assemblies, and export.
+`Smith.Plane` defines a local coordinate frame. `Smith.Sketch` describes a connected 2D region in that frame, optionally with holes. A frame gives the sketch its origin, axes, and perpendicular normal. Both are ordinary immutable Elixir values; construction performs no native operations. `Smith.extrude/2` turns a sketch into a normal Smith model recipe, ready for holes, booleans, fillets, assemblies, and export.
 
 ```elixir
 alias Smith.{Plane, Sketch}
@@ -59,7 +59,7 @@ oriented = Sketch.rectangle(10, 16, on: plane)
 - `Sketch.rectangle(width, height, opts)` defaults to centered local bounds.
 - `Sketch.circle(radius, opts)` defaults to a center at local `{0, 0}`.
 - `Sketch.polygon(points, opts)` retains the supplied 2D coordinates by default.
-- `Sketch.profile(edges, opts)` uses an ordered, connected, closed sequence of local line/arc descriptions.
+- `Sketch.profile(edges, opts)` uses an ordered, connected, closed sequence of local line, arc, spline, or Bézier descriptions.
 
 All accept `on: plane` and `at: {u, v}`. Rectangles, circles, and polygons also accept `align: {x, y}`, with each axis one of `:min`, `:center`, or `:max`. Alignment anchors the corresponding bounding-box minimum, midpoint, or maximum at the local origin, then applies `at:`. `align: :none` retains authored coordinates. Profiles retain their authored coordinates and accept `at:`, but do not accept `align:`.
 
@@ -83,7 +83,7 @@ semicircle = Sketch.profile([
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-`Sketch.line/2`, `arc/4`, and `spline/2` return edge descriptions for `profile/2`. Arc arguments are center, radius, start angle, and signed sweep. Positive angles turn counterclockwise in the local XY frame. Closure and topology are checked by the native kernel.
+`Sketch.line/2`, `arc/4`, `spline/2`, and `bezier/1` return edge descriptions for `profile/2`. Arc arguments are center, radius, start angle, and signed sweep. Positive angles turn counterclockwise in the local XY frame. Closure and topology are checked by the native kernel.
 
 `Sketch.on(sketch, plane)` reuses an outline in a different frame without changing the original:
 
@@ -100,6 +100,52 @@ side = outline |> Sketch.on(Plane.yz(x: 25)) |> Smith.extrude(3)
 <div class="smith-doc-preview" data-preview="sketches-3-side" data-model="side" data-label="Side profile">
 <p>Interactive preview available in HexDocs.</p>
 </div>
+
+## Draw a local spline
+
+Sketch splines interpolate local points. They can be mixed with lines and arcs to close an outline:
+
+```elixir
+arched = Sketch.profile([
+  Sketch.spline([{0, 0}, {5, 4}, {10, 0}], {{1, 1}, {1, -1}}),
+  Sketch.line({10, 0}, {0, 0})
+])
+arched_part = arched |> Smith.extrude(3)
+```
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched" data-model="arched" data-label="Spline profile">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+<div class="smith-doc-preview" data-preview="paths-and-shells-6-arched-part" data-model="arched_part" data-label="Extruded spline">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+The optional tangent pair specifies endpoint directions, not derivative magnitudes. Sketch placement rotates these directions with the plane and translates the interpolation points. This is distinct from `Smith.spline/2`, whose points and tangent vectors use world coordinates and whose result is an edge recipe suitable for a path.
+
+## Bézier control points
+
+`Sketch.bezier/1` uses control points, while `Sketch.spline/2` interpolates
+points on the curve. A Bézier touches its first and last control points and
+stays inside the control polygon's convex hull. Four points make a cubic;
+two make a line. Use explicit handles when an outline must stay within a
+known envelope. Join segments with matching tangent directions when a
+smooth transition matters.
+
+```elixir
+arch = Sketch.profile([
+  Sketch.bezier([{0, 0}, {1, 2}, {2, 0}]),
+  Sketch.line({2, 0}, {0, 0})
+])
+{:ok, arch_part} = arch |> Smith.extrude(3) |> Smith.evaluate()
+```
+
+<div class="smith-doc-preview" data-preview="bezier-arch" data-model="arch_part" data-label="Quadratic Bézier profile">
+<p>Interactive preview available in HexDocs.</p>
+</div>
+
+The [phone fit-dummy walkthrough](../examples/iphone-17-pro.livemd) builds a piecewise
+cubic contour through drawing stations and checks its dimensional envelope.
 
 ## Corners and extrusion
 
@@ -179,7 +225,3 @@ Open the [Livebook examples](livebook.md) to inspect each modeling stage and gen
 `Smith.hole(model, on: plane, at: {u, v}, diameter: d, through: :all)` drills along the plane normal through its local point. `at:` defaults to `{0, 0}`. The cutter spans the body's projected world bounds, including disconnected solids; the plane itself may lie outside the body. A hole that removes no material fails with `:hole_misses_body`. Use `depth:` instead of `through:` for a flat-bottomed blind hole into the negative plane normal. See [mechanical parts](mechanical-parts.md) for entry placement and recessed holes.
 
 `on: :top` selects the highest outward +Z planar face, positions relative to its area centroid, and drills along world Z. Earlier cuts can move that centroid; use a fixed plane when hole coordinates must remain fixed. Explicit planes do not select or attach to a face and do not resolve topology names.
-
-## Complete examples
-
-The [Livebook guide](livebook.md) includes runnable profiles and an assembly built from reusable part recipes, with previews and verified printable exports.

@@ -1,14 +1,16 @@
-# Smith — Attach parts and pose joints
+# Attach parts and pose joints
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install the pinned toolkit using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing native code.
+After [named assemblies](assembly.livemd), connect a pivoting arm to a base. A joint describes an attachment frame; a connection sets the relative pose. This lesson checks a pose without pretending to design a complete hinge.
 
-This notebook builds a base and an arm, defines their attachment frames, and creates several poses from the same immutable recipe. Units are millimeters and degrees. Each preview supports rotation, zoom, fullscreen, and PNG download. The final export contains the base and arm as separate printable parts.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Build the parts
 
@@ -81,15 +83,17 @@ The returned frame has an origin and three world-space unit axes: `u`, `v`, and 
 {:ok, pivot} = Assembly.fetch_joint(selected, :arm_axis)
 {:ok, moving} = Assembly.fetch(selected, :arm)
 {:ok, fixed} = Assembly.fetch(selected, :base)
-{:ok, {arm_low, _}} = OCEx.bounds(moving.shape)
-{:ok, {_, base_high}} = OCEx.bounds(fixed.shape)
-clearance = elem(arm_low, 2) - elem(base_high, 2)
-true = abs(clearance - 0.4) < 1.0e-7
+{:ok, fit} = Smith.Inspection.run(%{arm: moving, base: fixed}, checks: [
+  {:clearance, :arm, :base, minimum: 0.4, tolerance: 1.0e-7}
+])
+:passed = fit.status
+[check] = fit.checks
+clearance = check.measured
 Kino.DataTable.new([%{origin: inspect(pivot.frame.origin),
   axis: inspect(pivot.frame.n), clearance_mm: clearance}])
 ```
 
-Joint evaluation calculates placement. It does not check collisions, strength, or travel clearance. The check above verifies vertical separation of the parts' bounds in this pose. A mechanism with a range of motion needs checks across that range.
+Joint evaluation calculates placement. It does not check collisions, strength, or travel clearance. The check above measures the closest material distance and checks for interference in this pose. A mechanism with a range of motion needs checks across that range.
 
 ## Other motion types
 

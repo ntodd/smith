@@ -1,7 +1,7 @@
 # Design a Raspberry Pi enclosure
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## The design
@@ -10,11 +10,17 @@ We are building a desktop enclosure for a Raspberry Pi 5 and its Active Cooler. 
 
 ![The enclosure with its tray withdrawn](https://raw.githubusercontent.com/ntodd/smith/f6e4cb2dc91c2790ca75ef326a41d543336bce5a/guides/images/pi-enclosure.png)
 
-This is a modeling lesson: start with reference geometry, make parts that fit around it, give the moving parts explicit frames, and check the result before exporting it. Every modeling cell ends with Smith's built-in renderer. Drag to rotate, scroll to zoom, or use **Fullscreen** to inspect a detail. Earlier recipes remain available as we add features.
+This is a modeling lesson: start with reference geometry, make parts that fit around it, give the moving parts explicit frames, and check the result before exporting it. Modeling cells use Smith's built-in renderer; inspection cells show measurements or check results. Drag to rotate, scroll to zoom, or use **Fullscreen** to inspect a detail. Earlier recipes remain available as we add features.
 
 Work through the cells in order. The final cells write STEP, STL, 3MF, and SVG files beneath `output/pi-enclosure` in the notebook runtime's working directory. No other model files are needed.
 
 The design has been checked computationally, but has not yet been physically printed or temperature-tested. Treat the port and cooler reference envelopes as dimensions to verify against your hardware, rather than a claim of production fit.
+
+Before starting, work through [mechanical parts](mechanical-parts.livemd),
+[nested assemblies](nested-assemblies.livemd), and [joints](joints.livemd).
+Steps 1–7 build the chassis and tray; 8–13 add the duct, covers, and latch;
+14–20 assemble, check, and export them. A **coupon** is a small test piece that
+lets you check a fit before printing a complete part.
 
 ## 1. Establish the coordinate system
 
@@ -647,7 +653,10 @@ Kino.Layout.grid(
 
 ## 16. Check geometry, not just appearance
 
-A reusable check turns an intersection into a volume. Touching faces can share zero-volume boundaries; positive intersection volume means parts occupy the same space.
+Use named inspection reports for the fixed interfaces. The clearance check measures
+material distance and interference volume. Contact is allowed here, but overlap
+above the stated volume tolerance is a failure. For the many travel samples, a
+small native helper checks only overlap volume, which is the requirement at hand.
 
 Evaluate fixed geometry once. For the travel checks, translate the evaluated moving shape directly through OCEx. That avoids rebuilding all of its feature history at each sample. These are checks at discrete positions, not continuous collision detection.
 
@@ -688,9 +697,12 @@ fit_checks = [
 
 fit_rows =
   for {name, a, b} <- fit_checks do
-    volume = overlap.(a, b)
-    if volume >= 1.0e-5, do: raise("#{name} intersects by #{volume} mm³")
-    %{check: name, overlap_mm3: Float.round(volume, 8)}
+    {:ok, report} = Smith.Inspection.run(%{moving: a, fixed: b}, checks: [
+      {:clearance, :moving, :fixed, minimum: 0, tolerance: 1.0e-7, volume_tolerance: 1.0e-5}
+    ])
+    :passed = report.status
+    [check] = report.checks
+    %{check: name, overlap_mm3: Float.round(check.interference_mm3, 8)}
   end
 
 travel_rows =
@@ -749,8 +761,8 @@ Before printing a whole chassis, print a short rail section and the matching tra
 These are separate parts that print in their operating orientation. Test sliding and capture after normal cleanup. If you change the fit, update both the mating dimensions and the checks, then rerun the notebook. The current coupon records the 0.4 mm design, not a universal printer tolerance.
 
 ```elixir
-rail_coupon = body |> Smith.common(Smith.box(16, 14, 14, at: {-2, -12, 0}))
-tray_coupon = tray |> Smith.common(Smith.box(16, 8, 10, at: {-2, -7.5, 3}))
+rail_coupon = body_result |> Smith.from_result() |> Smith.common(Smith.box(16, 14, 14, at: {-2, -12, 0}))
+tray_coupon = tray_result |> Smith.from_result() |> Smith.common(Smith.box(16, 8, 10, at: {-2, -7.5, 3}))
 
 coupons =
   Assembly.new(:rail_fit)
@@ -790,14 +802,20 @@ Smith.Kino.render(exploded, label: "Enclosure, covers, service cartridge, and fe
 
 The 3D preview is useful for inspecting form. A drawing makes port layout and hidden features easier to compare. These views come from the evaluated tray, so there is no second outline to keep synchronized.
 
-The YZ view looks along −X toward the socket panel. Hidden lines are dashed. These are geometric views, not dimensioned manufacturing drawings.
+The YZ view looks along −X toward the socket panel. Hidden lines are dashed. Add a measured tray length to the top view. The label comes from the evaluated
+part and stays tied to that revision; this does not create a full manufacturing
+sheet or specify tolerances for every feature.
 
 ```elixir
 {:ok, tray_top_drawing} = Drawing.new(tray_result, on: :xy)
 {:ok, tray_front_drawing} = Drawing.new(tray_result, on: :yz)
+{:ok, tray_length} = Smith.Measure.extent(tray_result, :x)
+{:ok, tray_top_drawing} = Drawing.dimension(tray_top_drawing, tray_length,
+  orientation: :horizontal, offset: -10)
 {:ok, top_svg} = Drawing.svg(tray_top_drawing, title: "Tray · Top")
 {:ok, front_svg} = Drawing.svg(tray_front_drawing, title: "Tray · Socket panel")
-Kino.Layout.grid([Kino.Image.new(top_svg, :svg), Kino.Image.new(front_svg, :svg)], columns: 1)
+Kino.Layout.grid([Smith.Kino.render(tray_top_drawing, label: "Tray · Top"),
+  Smith.Kino.render(tray_front_drawing, label: "Tray · Socket panel")], columns: 1)
 ```
 
 <!-- <div class="smith-doc-preview" data-preview="pi-20-tray-top-drawing" data-model="tray_top_drawing" data-label="Tray · Top"></div> -->

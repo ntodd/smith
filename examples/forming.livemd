@@ -1,14 +1,16 @@
-# Smith — Form, cut, and thicken
+# Form, cut, and thicken
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
 
-Install OCCT 7.9.3 using the [OCEx installation guide](https://hexdocs.pm/ocex/installation.html). Restart the Livebook runtime after changing native code.
+After [extrusion](extrusion.livemd), modify an existing solid: taper its walls, cut it, and reuse a flat section. Then make a thin sleeve from a curved surface.
 
-This notebook builds a tapered blank, cuts it at a plane, and reuses a cross-section as another part. It then offsets and thickens a curved surface. Dimensions are millimeters and angles are degrees. Every preview supports rotation, zoom, fullscreen, and PNG download. The final cell exports all three solid parts as STEP, STL, and 3MF.
+Run cells in order. Lengths are millimeters and modeling angles are degrees.
+Each 3D preview supports orbit, zoom, and fullscreen.
+
 
 ## Draft the walls
 
@@ -37,7 +39,8 @@ The plane normal points toward +Z, so `keep: :negative` retains the material bel
 
 ```elixir
 cut_plane = Plane.xy(z: 6)
-lower = Smith.split(tapered, cut_plane, keep: :negative)
+tapered_snapshot = Smith.from_result(result)
+lower = Smith.split(tapered_snapshot, cut_plane, keep: :negative)
 {:ok, lower_result} = Smith.evaluate(lower)
 {:ok, volume} = OCEx.volume(lower_result.shape)
 expected = 320 * 6 - 36 * t * 36 + 4 / 3 * t * t * 216
@@ -50,13 +53,13 @@ Smith.Kino.render(lower_result, label: "2 · Lower portion")
 `section` returns the filled planar cross-section, including holes. Disconnected regions remain separate faces. Translate the section to the bed and extrude along a world vector; scalar extrusion is for sketches with a local plane.
 
 ```elixir
-cross_section = Smith.section(tapered, cut_plane)
+cross_section = Smith.section(tapered_snapshot, cut_plane)
 {:ok, section_result} = Smith.evaluate(cross_section)
 {:ok, area} = OCEx.area(section_result.shape)
 expected_area = (20 - 12 * t) * (16 - 12 * t)
 true = abs(area - expected_area) < 1.0e-5
 
-cap = cross_section |> Smith.translate({0, 0, -6}) |> Smith.extrude({0, 0, 2})
+cap = section_result |> Smith.from_result() |> Smith.translate({0, 0, -6}) |> Smith.extrude({0, 0, 2})
 {:ok, cap_result} = Smith.evaluate(cap)
 {:ok, volume} = OCEx.volume(cap_result.shape)
 true = abs(volume - expected_area * 2) < 1.0e-5

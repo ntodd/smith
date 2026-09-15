@@ -9,15 +9,7 @@ try {
   const data = await response.json();
   document.title = `${data.label} — Smith preview`;
   root.replaceChildren();
-  if (data.svg) {
-    const image = document.createElement('img');
-    image.alt = data.label;
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`;
-    image.style.cssText = 'display:block;width:100%;height:480px;object-fit:contain;background:white';
-    root.append(image);
-  } else {
-    init({root}, data);
-  }
+  init({root}, data);
 } catch (error) {
   root.replaceChildren();
   const message = document.createElement('p');

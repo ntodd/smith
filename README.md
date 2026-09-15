@@ -4,12 +4,18 @@ Smith is an Elixir CAD library. Build sketches, solids, and named assemblies wit
 
 Smith uses [OCEx](https://hexdocs.pm/ocex). The geometry engine is Open CASCADE Technology (OCCT) 7.9.3.
 
+New to CAD? Start with [CAD concepts](guides/cad-basics.md) and
+[getting started](guides/getting-started.md). The [Livebook catalog](guides/livebook.md#choose-a-lesson)
+orders the lessons from a single plate through assemblies and complete projects.
+Guides explain the API and its limits; notebooks let you change a model and inspect
+each stage.
+
 ## A printable part in one script
 
 Install the native toolkit using the [installation guide](https://hexdocs.pm/ocex/installation.html), then save this as `mount.exs`:
 
 ```elixir
-Mix.install([{:smith, "~> 0.1.0"}])
+Mix.install([{:smith, "~> 0.2.0"}])
 alias Smith.Sketch
 
 model =
@@ -31,9 +37,37 @@ IO.puts(files.three_mf)
 
 Run `elixir mount.exs`. The output bundle includes STEP, BREP, binary STL, and 3MF files, plus a report of the mesh and STEP checks. Every export gets a new directory; earlier exports remain available. 3MF contains printable geometry, without printer or slicer settings.
 
-In an existing Mix project, add `{:smith, "~> 0.1.0"}` to `deps/0`. Smith requires Elixir 1.18+ and a supported native installation; see the installation guide for the tested OS/OTP combinations. No display server is required to model, mesh, or export.
+In an existing Mix project, add `{:smith, "~> 0.2.0"}` to `deps/0`. Smith requires Elixir 1.18+ and a supported native installation; see the installation guide for the tested OS/OTP combinations. No display server is required to model, mesh, or export.
 
 The [HexDocs version of this README](https://hexdocs.pm/smith/readme.html) includes interactive previews below the examples. Drag to rotate, scroll to zoom, or open a preview fullscreen. GitHub shows still images.
+
+## Inspect what you built
+
+Smith 0.2 includes geometry-derived measurements, named inspection reports,
+headless PNG views, and measured SVG dimensions. Reports work in plain Elixir
+scripts and give coding agents useful evidence without requiring vision or
+Livebook. Kino adds standard views, edges, clipping, and colored modeling stages.
+
+```elixir
+{:ok, width} = Smith.Measure.extent(result, :x)
+{:ok, inspection} = Smith.Inspection.run(%{mount: result}, checks: [
+  {:measurement, :mount, width, expected: 60, tolerance: 1.0e-6}
+])
+:passed = inspection.status
+{:ok, drawing} = Smith.Drawing.new(result, on: :xy)
+{:ok, drawing} = Smith.Drawing.dimension(drawing, width, orientation: :horizontal, offset: -8)
+{:ok, svg} = Smith.Drawing.svg(drawing, title: "Measured mounting plate")
+```
+
+<div class="smith-doc-preview" data-preview="readme-measured-mount" data-model="svg" data-label="Measured mounting plate">
+<p><img src="guides/images/measured-mount.png" alt="Mounting plate with its measured 60 mm width"></p>
+</div>
+
+Read the [inspection guide](guides/inspection.md) for structured checks, stage
+comparisons, and revision-linked image reports. The [agent guide](guides/agent-modeling.md)
+explains the script workflow. ExDoc publishes [llms.txt](https://hexdocs.pm/smith/llms.txt)
+and Markdown API pages; the package also includes an optional
+[Smith CAD skill](skills/smith-cad/SKILL.md).
 
 ## Build a Raspberry Pi enclosure
 
@@ -44,6 +78,17 @@ lofts, shelling, nested assemblies, joints, clearance checks, and verified print
 It also includes rail coupons to test before printing the enclosure.
 
 [![Raspberry Pi enclosure with the service tray open](guides/images/pi-enclosure.png)](examples/raspberry-pi-enclosure.livemd)
+
+## Advanced study: phone fit dummy
+
+[Model an iPhone 17 Pro fit dummy](examples/iphone-17-pro.livemd) walks through
+Bézier corner profiles, an edge-roll loft, cameras, buttons, and connector
+locations. Build the complete device first, then derive two printable halves
+and alignment dowels. The notebook distinguishes drawing dimensions from
+assumptions and checks both geometry and exports. It uses the 0.2 API. The camera plateau is an adjustable approximation, and inspection has
+identified an edge-roll loft defect documented in the notebook. The model is
+not yet an exact fit reference.
+
 
 ## Modeling with functions
 
@@ -98,7 +143,7 @@ Named parts have installed, print, and display placement. Reuse groups with `Ass
 
 The [Livebook guide](guides/livebook.md) shows each construction stage in its own rotatable preview and lets you download PNG images. Kino is optional: add it to the notebook's dependencies to enable `Smith.Kino`. Modeling and export remain independent of the notebook.
 
-The [drawing Livebook](https://github.com/ntodd/smith/blob/main/examples/drawings.livemd)
+The [drawing Livebook](examples/drawings.livemd)
 builds a counterbored plate, compares top/front/oblique views, and exports SVG/DXF
 alongside printable geometry.
 

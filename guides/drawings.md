@@ -65,6 +65,27 @@ Sharp boundaries and silhouettes are included. `tangents: true` additionally
 includes smooth G1 boundaries between faces, which can help explain fillets.
 Surface seams and isoparametric lines are omitted.
 
+## Add measured dimensions
+
+Measure the part, then annotate a drawing from that same evaluated result. The
+width below comes from the geometry rather than a copied input parameter.
+
+```elixir
+{:ok, width} = Smith.Measure.extent(part, :x)
+{:ok, dimensioned} = Drawing.dimension(top, width, orientation: :horizontal, offset: -8)
+```
+
+<div class="smith-doc-preview" data-preview="drawings-measured" data-model="dimensioned" data-label="Measured plate width">
+<p>Dimensioned SVG available in HexDocs.</p>
+</div>
+
+Linear, radius, diameter, and angle annotations retain their source revision and
+measurement anchors. Position labels with `offset:`; layout is explicit, without
+automatic collision avoidance. These annotations do not drive the model. A
+measurement from another revision or a foreshortened projection is rejected.
+The [inspection guide](inspection.md#put-measured-dimensions-on-a-drawing)
+adds center spacing and a hole diameter.
+
 ## Inspect and sample
 
 `drawing.visible` and `drawing.hidden` are native edge collections in view-local
@@ -89,21 +110,22 @@ are normal, particularly for a single face or sphere silhouette.
 
 ## Display in Livebook
 
-SVG previews need no server-side graphics process. Install Kino alongside Smith,
-then leave the image as the cell's last value:
+The built-in drawing preview fills the notebook width, supports fullscreen, and
+downloads the original SVG with millimeter dimensions intact:
 
 ```elixir
 {:ok, svg} = Drawing.svg(top, hidden: false, title: "Plate · Top")
-Kino.Image.new(svg, :svg)
+Smith.Kino.render(dimensioned, label: "Measured mounting plate", hidden: false)
 ```
 
-<div class="smith-doc-preview" data-preview="drawings-3-svg" data-model="svg" data-label="Visible top edges">
+<div class="smith-doc-preview" data-preview="drawings-3-svg" data-model="dimensioned" data-label="Measured mounting plate">
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
 This is a static 2D drawing. `Smith.Kino.render(part)` provides the rotatable 3D
-view. Use both when inspecting a model. The
-[drawing notebook](https://github.com/ntodd/smith/blob/main/examples/drawings.livemd)
+view. Use both when inspecting a model. `Kino.Image.new(svg, :svg)` also displays a raw
+SVG, but uses its intrinsic physical size and can look small. The
+[drawing notebook](../examples/drawings.livemd)
 builds a counterbored plate and compares top, front, and oblique views.
 
 ## Write SVG and DXF
@@ -144,7 +166,9 @@ geometry. An empty drawing returns `:empty_drawing`.
 DXF uses AC1015 (AutoCAD 2000), `$INSUNITS=4`, and LWPOLYLINE entities. It retains
 the drawing's XY coordinates and has VISIBLE and HIDDEN layers with continuous
 and dashed linetypes. Arcs, circles, and splines are exported as polylines.
-Empty drawings are allowed. There are no dimensions, text, blocks, or paper layouts.
+Empty drawings are allowed. DXF has no dimension entities, text, blocks, or paper
+layouts. Exporting a dimensioned drawing to DXF returns `:unsupported_annotations`;
+keep an unannotated drawing for DXF exchange.
 
 ## Assemblies and limits
 
@@ -153,7 +177,7 @@ extras are excluded. Pass an evaluated `Assembly.view(result, :exploded)` to dra
 that pose, or use `Assembly.fetch/2` to draw one member or reference. Visibility
 is computed across the selected geometry, so one part can hide another.
 
-These are view drawings, not dimensioned engineering sheets or cutting-tool
-paths. Validate scale and contours in the receiving application before using a
+These views can carry measured SVG annotations, but do not provide automatic
+engineering sheet layouts or cutting-tool paths. Validate scale and contours in the receiving application before using a
 file for manufacture. The SVG/DXF writers do not import drawings or infer sketches
 from them. Use `Smith.export/3` for verified printable STL/3MF bundles.

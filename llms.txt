@@ -1,0 +1,25 @@
+# Smith 0.2
+
+> Native Elixir CAD: immutable recipes, geometry measurements, structured inspection, assemblies, dimensioned drawings, and verified printable exports.
+
+Use the installed package version. Models work in .exs scripts and Livebook.
+Inspection JSON supports agents without vision; PNG observations require no
+browser or GPU. Check report.status, not just the outer {:ok, report} tuple.
+
+## Start here
+
+- [CAD concepts](https://hexdocs.pm/smith/cad-basics.md): terminology, coordinate conventions, and tolerances.
+- [Livebook catalog](https://hexdocs.pm/smith/livebook.md): lessons ordered by topic and complexity.
+- [Agent modeling guide](https://hexdocs.pm/smith/agent-modeling.md): workflow, tool selection, and limits.
+- [Inspection and validation](https://hexdocs.pm/smith/inspection.md): runnable reporting and measurement examples.
+- [Full API index](https://hexdocs.pm/smith/llms.txt): ExDoc-generated Markdown documentation.
+- [Smith CAD skill](skills/smith-cad/SKILL.md): optional instructions for skill-aware coding harnesses.
+
+## APIs
+
+- [Smith](https://hexdocs.pm/smith/Smith.md): modeling recipes and snapshot reuse.
+- [Inspection](https://hexdocs.pm/smith/Smith.Inspection.md): named sources, checks, topology pages, and artifacts.
+- [Measurements](https://hexdocs.pm/smith/Smith.Measure.md): geometry-derived values and anchors.
+- [Headless rendering](https://hexdocs.pm/smith/Smith.Render.md): standard PNG views and colored stages.
+- [Drawings](https://hexdocs.pm/smith/Smith.Drawing.md): orthographic SVG/DXF and measured SVG annotations.
+- [OCEx](https://hexdocs.pm/ocex/llms.txt): native geometry contracts and installation.
