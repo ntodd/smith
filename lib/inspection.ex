@@ -132,7 +132,8 @@ defmodule Smith.Inspection do
   """
   @spec topology(Measure.source(), :faces | :edges, keyword()) :: {:ok, map()} | {:error, term()}
   def topology(source, kind, opts \\ []) do
-    with true <- Geometry.options(opts, [:selector, :offset, :limit]) and kind in [:faces, :edges],
+    with true <- Geometry.options(opts, [:selector, :offset, :limit]),
+         true <- kind in [:faces, :edges],
          offset = Keyword.get(opts, :offset, 0),
          limit = Keyword.get(opts, :limit, 20),
          true <- is_integer(offset) and offset >= 0 and is_integer(limit) and limit in 1..100,
@@ -384,7 +385,11 @@ defmodule Smith.Inspection do
 
   defp tolerance(opts, extra \\ []) do
     if Geometry.options(opts, [:tolerance | extra]) and is_number(opts[:tolerance]) and
-         opts[:tolerance] >= 0, do: {:ok, opts[:tolerance]}, else: {:error, :invalid_options}
+         opts[:tolerance] >= 0 do
+      {:ok, opts[:tolerance]}
+    else
+      {:error, :invalid_options}
+    end
   end
 
   defp outcome(kind, names, measured, expected, tolerance, passed, extra),

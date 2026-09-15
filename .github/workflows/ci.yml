@@ -51,7 +51,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake curl ca-certificates patch
       - name: Dependencies
         run: mix deps.get
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         id: occt
         with:
           path: .occt
@@ -59,6 +59,12 @@ jobs:
       - name: Build pinned OCCT
         if: steps.occt.outputs.cache-hit != 'true'
         run: sh "${OCEX_PATH:-deps/ocex}/scripts/install-occt.sh" "$GITHUB_WORKSPACE/.occt"
+      - name: Cache verified OCCT installation
+        if: steps.occt.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .occt
+          key: ${{ steps.occt.outputs.cache-primary-key }}
       - name: Tests and documentation
         run: make check docs notebooks
       - name: Package and isolated consumer
