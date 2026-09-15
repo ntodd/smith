@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Reorganize guides and Livebooks into a 0.2 learning path, with CAD terminology,
   measured drawing lessons, and explicit limitations in the phone study.
@@ -16,7 +16,7 @@
 - Add `Smith.from_result/1` to branch from evaluated geometry without rebuilding earlier operations.
 
 - Add world-space and sketch Bézier curves backed by OCEx 0.2.
-- Add an iPhone 17 Pro fit-dummy Livebook with dimensioned profile stations, documented approximations, feature checks, and verified one-piece/split print exports.
+- Add an iPhone 17 Pro modeling study with dimensioned profile stations, inspection checks, and one-piece/split exports. Document the unresolved edge-roll defect; this study is not a validated case-fit reference.
 
 - Add a Raspberry Pi enclosure Livebook covering reference geometry, a sliding tray, cam latch, cooling duct, clearance checks, and printable exports, with interactive previews in HexDocs.
 

@@ -1,8 +1,17 @@
 name: Release checks
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      published_ocex:
+        description: Test against OCEx from public Hex instead of the staged release
+        type: boolean
+        default: false
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
 jobs:
@@ -17,18 +26,21 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     env:
-      # Test the companion OCEx 0.2 change before its Hex publication.
-      OCEX_PATH: ${{ github.workspace }}/.ci/ocex
-      OCEX_ARCHIVE: ${{ github.workspace }}/.ci/ocex/ocex-0.2.0.tar
       OpenCASCADE_DIR: ${{ github.workspace }}/.occt/lib/cmake/opencascade
     steps:
       - uses: actions/checkout@v4
-      - name: Companion OCEx revision
+      - name: Staged OCEx release
+        if: ${{ !inputs.published_ocex }}
         uses: actions/checkout@v4
         with:
           repository: ntodd/ocex
-          ref: f09c5cdd8d978bac8955c6a5e49db939092f1742
+          ref: a38b499f8740714a35dd27a911b8c15ed0adfe15
           path: .ci/ocex
+      - name: Use staged OCEx
+        if: ${{ !inputs.published_ocex }}
+        run: |
+          echo "OCEX_PATH=$GITHUB_WORKSPACE/.ci/ocex" >> "$GITHUB_ENV"
+          echo "OCEX_ARCHIVE=$GITHUB_WORKSPACE/.ci/ocex/ocex-0.2.0.tar" >> "$GITHUB_ENV"
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.beam.elixir }}
@@ -43,15 +55,15 @@ jobs:
         id: occt
         with:
           path: .occt
-          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.ci/ocex/scripts/**') }}
+          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.ci/ocex/scripts/install-occt.sh', '.ci/ocex/scripts/check-allocator.cpp', '.ci/ocex/scripts/patches/**', 'deps/ocex/scripts/install-occt.sh', 'deps/ocex/scripts/check-allocator.cpp', 'deps/ocex/scripts/patches/**') }}
       - name: Build pinned OCCT
         if: steps.occt.outputs.cache-hit != 'true'
-        run: sh .ci/ocex/scripts/install-occt.sh "$GITHUB_WORKSPACE/.occt"
+        run: sh "${OCEX_PATH:-deps/ocex}/scripts/install-occt.sh" "$GITHUB_WORKSPACE/.occt"
       - name: Tests and documentation
         run: make check docs notebooks
       - name: Package and isolated consumer
         run: |
-          (cd .ci/ocex && mix hex.build)
+          if [ -n "${OCEX_PATH:-}" ]; then (cd "$OCEX_PATH" && mix hex.build); fi
           make package package-smoke
       - uses: actions/upload-artifact@v4
         with:

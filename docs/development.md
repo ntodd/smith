@@ -24,8 +24,10 @@ make models
 
 This variable is an explicit development option, not an automatic sibling lookup.
 The standalone model scripts honor it too. Unset it before public dependency or
-publication checks. Smith's hosted CI deliberately resolves OCEx from Hex and
-therefore requires the first OCEx publication before it can pass.
+publication checks. For the 0.2 release, hosted CI builds a pinned OCEx revision
+and tests the two package archives together. After OCEx 0.2 is published, run the
+workflow with `published_ocex=true` to test Smith against public Hex without a
+checkout override.
 
 `make check` runs formatting, warnings-as-errors compilation, behavioral tests,
 doctests, and public model acceptance tests. `make docs` executes README/guide code
@@ -42,10 +44,10 @@ Build OCEx's archive in its own repository, then pass the archive explicitly:
 
 ```sh
 make package
-OCEX_ARCHIVE=/absolute/path/to/ocex-0.1.0.tar make package-smoke
+OCEX_ARCHIVE=/absolute/path/to/ocex-0.2.0.tar make package-smoke
 ```
 
-Without `OCEX_ARCHIVE`, the check fetches OCEx 0.1.0 from Hex. The consumer runs
+Without `OCEX_ARCHIVE`, the check fetches OCEx 0.2.0 from Hex. The consumer runs
 outside the checkout with fresh caches and installs both packages from archives;
 it does not use a path dependency. It checks native geometry, STEP exchange,
 serialized STL topology, 3MF contents, and Kino's optional dependency behavior.

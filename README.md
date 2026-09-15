@@ -166,7 +166,7 @@ alongside printable geometry.
 
 ## Scope
 
-Version 0.1 covers explicit dimensions, Boolean operations, edge and face selection, edge finishing, extrusion, revolution, ruled and smooth lofts, open-path sweeps, shelling with selected openings, draft, planar splits and sections, surface offset, and thickening. Sketches support lines, arcs, interpolated splines, and cutouts.
+Smith covers explicit dimensions, Boolean operations, edge and face selection, edge finishing, extrusion, revolution, ruled and smooth lofts, open-path sweeps, shelling with selected openings, draft, planar splits and sections, surface offset, and thickening. Sketches support lines, arcs, interpolated splines, Bézier curves, and cutouts. Version 0.2 adds geometric measurements, structured inspection reports, headless images, and dimensioned SVG drawings.
 
 There is no sketch constraint solver, persistent topology naming, closed-linkage solver, or STEP product tree. Assembly joints provide directed rigid placement with explicit motion coordinates. Surface offsets follow 3D normals; planar sketch-outline offsets are not implemented. Thickening requires an open surface. Sketch subtraction retains one connected region. Loft and sweep sections cannot contain holes; sweep profiles must be placed explicitly. Shelling requires an opening.
 
