@@ -1,6 +1,6 @@
 # Mechanical parts
 
-A reusable part usually needs a small set of deliberate dimensions: its outline, fastener locations, clearances, and placement. Keep those dimensions in ordinary Elixir values and functions. Smith recipes compose without evaluating intermediate bodies.
+Define a reusable part by its outline, fastener locations, clearances, and placement. Keep those dimensions in ordinary Elixir values and functions. Smith recipes compose without evaluating intermediate bodies.
 
 ## A slotted mounting plate
 

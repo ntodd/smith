@@ -1,3 +1,5 @@
+import { toolbar, iconButton } from './toolbar.js';
+
 // SVG keeps its model-space dimensions; the image viewport controls screen size.
 export function drawing(ctx, data) {
   const panel = document.createElement('div');
@@ -10,18 +12,15 @@ export function drawing(ctx, data) {
     .smith-drawing:fullscreen { display:flex;flex-direction:column;border:0;border-radius:0; }
     .smith-drawing:fullscreen img { flex:1;min-height:0;height:0;max-height:none; }
   `;
-  const bar = document.createElement('div');
-  bar.style.cssText = 'display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:10px;background:#f8fafc';
-  const label = document.createElement('strong');
-  label.textContent = data.label; label.style.flex = '1';
-  const save = document.createElement('button'); save.type = 'button'; save.textContent = 'Download SVG';
-  const full = document.createElement('button'); full.type = 'button'; full.textContent = 'Fullscreen';
+  const {header: bar, controls} = toolbar(ctx, panel, data.label);
+  const save = iconButton('Download SVG', 'download');
+  const full = iconButton('Fullscreen', 'fullscreen');
   full.setAttribute('aria-pressed', 'false');
   full.disabled = !document.fullscreenEnabled || typeof panel.requestFullscreen !== 'function';
   const image = document.createElement('img'); image.alt = data.label;
   image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(data.svg)}`;
   const status = document.createElement('p'); status.setAttribute('role', 'status'); status.hidden = true;
-  bar.append(label, save, full); panel.append(bar, image, status); ctx.root.append(style, panel);
+  controls.append(save, full); panel.append(bar, image, status); ctx.root.append(style, panel);
   save.onclick = () => {
     const link = document.createElement('a'); link.href = image.src; link.download = 'drawing.svg'; link.click();
   };
@@ -37,7 +36,8 @@ export function drawing(ctx, data) {
   };
   panel.addEventListener('fullscreenchange', () => {
     const active = document.fullscreenElement === panel;
-    full.textContent = active ? 'Exit fullscreen' : 'Fullscreen';
+    full.setAttribute('aria-label', active ? 'Exit fullscreen' : 'Fullscreen');
+    full.title = active ? 'Exit fullscreen (Esc)' : 'Fullscreen';
     full.setAttribute('aria-pressed', String(active));
   });
 }

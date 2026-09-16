@@ -4,7 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smith 3D preview</title>
-  <style>body { margin: 0; font: 14px system-ui; } p { padding: 1rem; } .smith-drawing img { height:calc(100vh - 44px);max-height:none; }</style>
+  <style>
+    html, body, #preview { height:100%; }
+    body { margin:0;font:14px system-ui; }
+    p { padding:1rem; }
+    #preview > .smith-viewer { display:flex;flex-direction:column;height:100%;box-sizing:border-box; }
+    #preview > .smith-preview canvas,
+    #preview > .smith-drawing img { flex:1;min-height:0;height:0;max-height:none;object-fit:contain; }
+  </style>
 </head>
 <body>
   <div id="preview"><p role="status">Loading 3D preview…</p></div>

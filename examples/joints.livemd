@@ -1,7 +1,7 @@
 # Attach parts and pose joints
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
@@ -114,7 +114,7 @@ end) |> Kino.Layout.grid(columns: 2)
 
 Dependencies resolve target-first even when connections are declared in another order. Each moving member can have only one controlling connection. Cycles and self-connections fail. Inside a subassembly, local connections resolve first; connecting `[:module, :pin]` at its parent level then moves the **whole module**, retaining its internal pose. This is directed assembly placement, not a solver for closed linkages.
 
-## Inspect the connected parts apart
+## Exploded view
 
 The exploded view starts with the selected joint pose. It lifts the arm 12 mm
 along world Z and retains its 45° rotation. The connection and installed result

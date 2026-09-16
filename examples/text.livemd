@@ -1,0 +1,74 @@
+# Text and fonts
+
+```elixir
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Inspect a real font
+
+This example uses the bundled SIL-licensed Graduate font. Replace the path with
+an explicit TTF/OTF file to choose your own typeface. Keep private rosters and
+custom assets outside the public repository. FreeType, HarfBuzz and pkg-config
+are native prerequisites; see the OCEx installation guide.
+
+```elixir
+alias Smith.{Font, Text, Sketch, Plane}
+{:ok, font} = Font.load(Path.join(:code.priv_dir(:smith), "fonts/Graduate-Regular.ttf"))
+name = "ALEXANDRA"
+text = Text.new(name, font: font, size: 10, align: {:center, :center})
+{:ok, layout} = Text.layout(text)
+IO.inspect(Map.take(layout.report, [:font, :width, :height, :advance]))
+Smith.Kino.render(layout.result, label: "Actual font outlines", view: :top)
+```
+
+## Fit without stretching
+
+Size is measured in em millimeters, not visible capital height. Fit uses the
+actual ink bounds and scales uniformly. A minimum size makes overly long names
+fail for review, rather than producing arbitrarily small lettering.
+
+```elixir
+{:ok, fitted} = Text.fit(text, {40, 12}, margin: 1, min_size: 5)
+{:ok, label} = Text.validate(fitted,
+  within: {{-20, -6}, {20, 6}}, margin: 1, min_height: 4)
+:passed = label.report.status
+IO.inspect(label.report.checks)
+{:ok, artifacts} = Text.write(label, "output/name-reports")
+IO.puts(artifacts.report)
+Smith.Kino.render(label.result, label: "Fitted name", view: :top)
+```
+
+PNG and outline SVG previews come from the same measured snapshot. The JSON
+records the font SHA-256, geometry revision, glyph positions and fit checks.
+These checks do not certify minimum stroke thickness or a printer's resolution.
+
+## Build a raised-name tag
+
+The base is 3 mm thick. The lettering starts at 2.8 mm so its extrusion overlaps
+and fuses with the base. The circular left end is reserved for a sports motif.
+
+```elixir
+letters = label.result |> Smith.from_result() |> Smith.extrude({0, 0, 1})
+  |> Smith.translate({8, 0, 2.8})
+base = Sketch.slot(70, 22)
+  |> Sketch.cut(Sketch.circle(2, at: {-29, 0}))
+  |> Smith.extrude(3)
+tag = base |> Smith.fuse(letters)
+{:ok, result} = Smith.evaluate(tag)
+{:ok, inspection} = Smith.Inspection.run(%{tag: result},
+  checks: [{:topology, :tag, :solids, expected: 1}])
+:passed = inspection.status
+Smith.Kino.render(result, label: "Printable named tag", edges: true)
+```
+
+## Export checked print files
+
+```elixir
+{:ok, files} = Smith.export(result, "output/keychains", name: "sample-player", on_bed: true)
+IO.puts(files.three_mf)
+```
+
+To batch a roster, put the fitting and modeling cells in a function taking the
+name, then call it for each entry. Use unique safe export IDs rather than raw
+names as filenames. To engrave, place the text cutter inside the top surface and
+use `Smith.cut/2`. See the text guide for arbitrary-plane placement and limits.

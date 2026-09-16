@@ -2,7 +2,7 @@
 
 These operations build solids from a path, a sequence of sections, or an existing body. Dimensions are in millimeters. All Smith constructors below return recipes; geometry and selection errors appear when you call `Smith.evaluate/1`.
 
-## Select geometry by its meaning
+## Edge and face selection
 
 Selectors are ordinary immutable values. Each filter narrows the preceding selection:
 

@@ -1,4 +1,5 @@
 import { drawing } from './drawing.js';
+import { toolbar, iconButton } from './toolbar.js';
 
 export function init(ctx, data) {
   if (data.svg) return drawing(ctx, data);
@@ -13,12 +14,10 @@ export function init(ctx, data) {
     .smith-preview:fullscreen canvas { flex:1; min-height:0; height:0; }
   `;
   ctx.root.append(style);
-  const bar = document.createElement("div");
-  bar.style.cssText = "display:flex;align-items:center;flex-wrap:wrap;flex-shrink:0;gap:12px;padding:10px;background:#f8fafc";
-  const label = document.createElement("strong"); label.textContent = data.label; label.style.flex = "1";
-  const reset = document.createElement("button"); reset.textContent = "Reset view";
-  const save = document.createElement("button"); save.textContent = "Download PNG";
-  const fullscreen = document.createElement("button"); fullscreen.textContent = "Fullscreen";
+  const {header: bar, controls} = toolbar(ctx, panel, data.label);
+  const reset = iconButton("Reset view", "reset");
+  const save = iconButton("Download PNG", "download");
+  const fullscreen = iconButton("Fullscreen", "fullscreen");
   fullscreen.setAttribute("aria-pressed", "false");
   fullscreen.disabled = !document.fullscreenEnabled || typeof panel.requestFullscreen !== "function";
   fullscreen.title = fullscreen.disabled ? "Fullscreen is unavailable in this browser or notebook embed." : "Show the 3D preview fullscreen";
@@ -28,16 +27,46 @@ export function init(ctx, data) {
     const option = document.createElement("option"); option.value=name; option.textContent=name[0].toUpperCase()+name.slice(1); views.append(option);
   }
   views.value=data.view || "isometric";
-  const edges = document.createElement("button"); edges.textContent="Edges"; edges.type="button";
+  const edges = iconButton("Edges", "edges");
   let showEdges=Boolean(data.edges); edges.setAttribute("aria-pressed",String(showEdges));
   const clipAxis=document.createElement("select"); clipAxis.setAttribute("aria-label","Clipping plane");
   for (const [value,text] of [["off","No clipping"],["x","Clip X"],["y","Clip Y"],["z","Clip Z"],...(data.clip?[["custom","Specified plane"]]:[])]) {
     const option=document.createElement("option");option.value=value;option.textContent=text;clipAxis.append(option);
   }
-  const clipPosition=document.createElement("input");clipPosition.type="range";clipPosition.min="0";clipPosition.max="100";clipPosition.value="50";clipPosition.setAttribute("aria-label","Clip position");clipPosition.style.width="90px";
+  const clipPosition=document.createElement("input");clipPosition.type="range";clipPosition.min="0";clipPosition.max="100";clipPosition.value="50";clipPosition.setAttribute("aria-label","Clip position");
   const clipSide=document.createElement("button");clipSide.textContent="Flip clip";clipSide.type="button";
   clipAxis.value=data.clip?"custom":"off";
-  bar.append(label,views,edges,clipAxis,clipPosition,clipSide,reset,save,fullscreen);
+  const clipping = iconButton("Clipping", "clip");
+  const clipOptions = document.createElement("div");
+  clipOptions.className = "smith-clip-options";
+  clipOptions.id = `smith-clip-${crypto.randomUUID()}`;
+  clipOptions.hidden = true;
+  clipping.setAttribute("aria-controls", clipOptions.id);
+  clipping.setAttribute("aria-expanded", "false");
+  for (const [text, control] of [["Plane", clipAxis], ["Position", clipPosition]]) {
+    const label = document.createElement("label"); label.append(text, control); clipOptions.append(label);
+  }
+  clipOptions.append(clipSide);
+  function closeClipping() {
+    clipOptions.hidden = true; clipping.setAttribute("aria-expanded", "false");
+  }
+  clipping.onclick = () => {
+    clipOptions.hidden = !clipOptions.hidden;
+    clipping.setAttribute("aria-expanded", String(!clipOptions.hidden));
+    if (!clipOptions.hidden) clipAxis.focus();
+  };
+  panel.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !clipOptions.hidden) {
+      event.preventDefault(); closeClipping(); clipping.focus();
+    }
+  });
+  panel.addEventListener("pointerdown", event => {
+    if (!clipOptions.contains(event.target) && !clipping.contains(event.target)) closeClipping();
+  });
+  panel.addEventListener("focusout", event => {
+    if (!clipOptions.contains(event.relatedTarget) && !clipping.contains(event.relatedTarget)) closeClipping();
+  });
+  controls.append(views, edges, clipping, reset, save, fullscreen);
   const canvas = document.createElement("canvas");
   canvas.setAttribute("aria-label", `${data.label}: drag to rotate, scroll to zoom`);
   canvas.style.cssText = "display:block;width:100%;touch-action:none;cursor:grab";
@@ -48,7 +77,7 @@ export function init(ctx, data) {
   caption.textContent = `${geometry} · ${data.revision.slice(0, 12)} · Drag to rotate · Scroll to zoom`;
   const status = document.createElement("div"); status.setAttribute("role", "status"); status.hidden = true;
   status.style.cssText = "padding:8px 12px;flex-shrink:0";
-  panel.append(bar, canvas, caption, status); ctx.root.append(panel);
+  panel.append(bar, clipOptions, canvas, caption, status); ctx.root.append(panel);
   fullscreen.onclick = async () => {
     status.hidden = true;
     try {
@@ -61,7 +90,7 @@ export function init(ctx, data) {
   };
   panel.addEventListener("fullscreenchange", () => {
     const active = document.fullscreenElement === panel;
-    fullscreen.textContent = active ? "Exit fullscreen" : "Fullscreen";
+    fullscreen.setAttribute("aria-label", active ? "Exit fullscreen" : "Fullscreen");
     fullscreen.setAttribute("aria-pressed", String(active));
     fullscreen.title = active ? "Exit fullscreen (Esc)" : "Show the 3D preview fullscreen";
   });
@@ -124,7 +153,9 @@ export function init(ctx, data) {
     canvas.width=Math.max(1,Math.round(canvas.clientWidth*ratio)); canvas.height=Math.max(1,Math.round(canvas.clientHeight*ratio));
     gl.viewport(0,0,canvas.width,canvas.height); gl.clearColor(0.94,0.96,0.98,1); gl.enable(gl.DEPTH_TEST); gl.frontFace(gl.CCW);
     gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
-    for (const [k,v] of Object.entries({yaw,pitch,zoom,aspect:canvas.width/canvas.height})) gl.uniform1f(uniforms[k],v);
+    const aspect = canvas.width / canvas.height;
+    const fittedZoom = zoom * Math.min(1, aspect);
+    for (const [k,v] of Object.entries({yaw,pitch,zoom:fittedZoom,aspect})) gl.uniform1f(uniforms[k],v);
     let clipNormal=[0,0,0], clipOffset=0;
     if(clipAxis.value==="custom") {
       clipNormal=data.clip.normal.map(v=>v*clipSign);
@@ -135,6 +166,7 @@ export function init(ctx, data) {
     }
     clipPosition.disabled=clipAxis.value==="off" || clipAxis.value==="custom";
     clipSide.disabled=clipAxis.value==="off";
+    clipping.setAttribute("aria-pressed", String(clipAxis.value!=="off"));
     gl.uniform4f(uniforms.clipPlane,...clipNormal,clipOffset);gl.uniform1f(uniforms.clipEnabled,clipAxis.value==="off"?0:1);
     gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(1,1);
     gl.uniform1f(uniforms.lines, 0);

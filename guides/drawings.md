@@ -83,7 +83,7 @@ Linear, radius, diameter, and angle annotations retain their source revision and
 measurement anchors. Position labels with `offset:`; layout is explicit, without
 automatic collision avoidance. These annotations do not drive the model. A
 measurement from another revision or a foreshortened projection is rejected.
-The [inspection guide](inspection.md#put-measured-dimensions-on-a-drawing)
+The [inspection guide](inspection.md#drawing-dimensions)
 adds center spacing and a hole diameter.
 
 ## Inspect and sample

@@ -4,7 +4,7 @@ Smith's inspection tools work in an Elixir process. A coding harness needs shell
 access to the native toolkit and a way to read files or stdout; Livebook and
 vision are optional. Start with the [inspection guide](inspection.html).
 
-## A working loop
+## Modeling workflow
 
 1. Read the project's coordinate convention, units, design requirements, and
    existing source. Preserve user edits and identify unresolved drawing data.
@@ -20,7 +20,7 @@ vision are optional. Start with the [inspection guide](inspection.html).
 6. Export printable geometry with `Smith.export/3`, which runs mesh and STEP
    readback checks. A valid CAD solid alone does not establish printability.
 
-## Choosing evidence
+## Measurements and checks
 
 | Question | Tool |
 | --- | --- |
@@ -40,7 +40,7 @@ parameter is a design intention, not a measurement of the result. Equal volumes
 also do not prove equal shapes. For important revisions, compare the actual
 added and removed material.
 
-## Errors and boundaries
+## Errors and limitations
 
 Geometry operations return tagged errors. A selector matching multiple features
 must be refined; do not silently choose its first result. Topology indices belong
@@ -54,7 +54,7 @@ dimensions. Document an assumption before using it as a target.
 
 `Smith.Inspection` currently handles material bounds, topology counts, containment,
 clearance, and measured-value checks. It does not certify production fit or infer all design
-requirements. Headless images are opaque, flat-shaded mesh observations. Drawing
+requirements. Headless images render opaque meshes with flat shading. Drawing
 dimensions are SVG annotations, not driving constraints or automatic drafting.
 
 ## Skills and documentation discovery

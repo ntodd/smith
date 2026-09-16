@@ -15,10 +15,10 @@ The OCCT libraries must remain installed after compilation. A successful Mix dep
 For a standalone file:
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}])
+Mix.install([{:smith, "~> 0.3.0"}])
 ```
 
-For an existing Mix application, add `{:smith, "~> 0.2.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. There is no Smith application process or supervision tree to configure.
+For an existing Mix application, add `{:smith, "~> 0.3.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. There is no Smith application process or supervision tree to configure.
 
 ## Define a reusable part
 
@@ -50,7 +50,7 @@ IO.puts(files.three_mf)
 
 Use a struct for parameters when a design has many dimensions; pass it to feature functions. Ordinary `Enum.map`, comprehensions, and pipelines are enough for patterns and assembly construction. Parameter values do not need a separate schema or framework.
 
-## Understand the values
+## Model types
 
 | Value                   | Meaning                                               |
 | ----------------------- | ----------------------------------------------------- |
@@ -83,7 +83,7 @@ Queries return tagged results. Dimensions use millimeters, volumes cubic millime
 Open the [Livebook guide](livebook.md) to see stages while editing. Native geometry and printable exports also work in a terminal without a browser.
 
 
-## Continue learning
+## Further examples
 
 For an interactive start, open [A plate, step by step](../examples/plate.livemd).
 For scripts, continue with [functions and pipelines](modeling.md), then

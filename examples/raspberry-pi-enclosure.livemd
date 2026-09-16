@@ -1,7 +1,7 @@
 # Design a Raspberry Pi enclosure
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## The design
@@ -69,9 +69,9 @@ Smith.Kino.render(pcb, label: "PCB outline and mounting holes")
 
 ## 2. Model the reference geometry
 
-Reference geometry needs enough detail to expose interference. It does not need every resistor. The sockets below have open fronts, so the preview also makes the board's orientation easy to recognize. Their dimensions are deliberately kept in a short table that can be corrected after measurement.
+Reference geometry must include the features that could interfere with the enclosure. The sockets below have open fronts, so the preview also makes the board's orientation easy to recognize. Their dimensions are in a table so they can be updated after measurement.
 
-The cooler's visible fins and blower are illustrative. A separate bounding envelope will be used for the clearance check, so a pretty reference model cannot hide a collision in an omitted detail. The envelope is placed wholly above the PCB, including the drawing's full overall height; that is conservative vertically.
+The cooler's fins and blower are simplified. The clearance check uses a separate box enclosing the cooler, including space omitted from the visible model. The envelope is placed wholly above the PCB, including the drawing's full overall height; that is conservative vertically.
 
 ```elixir
 end_ports = [{10.2, 17.0, 14.0}, {29.1, 15.0, 16.0}, {47.0, 15.0, 16.0}]
@@ -651,7 +651,7 @@ Kino.Layout.grid(
 
 <!-- <div class="smith-doc-preview" data-preview="pi-15-open-board" data-model="open_board" data-label="Board follows the cartridge"></div> -->
 
-## 16. Check geometry, not just appearance
+## 16. Check clearances and latch engagement
 
 Use named inspection reports for the fixed interfaces. The clearance check measures
 material distance and interference volume. Contact is allowed here, but overlap
@@ -787,7 +787,7 @@ Kino.Layout.grid(
 
 <!-- <div class="smith-doc-preview" data-preview="pi-exploded-coupons" data-model="exploded_coupons" data-label="Print these two pieces first"></div> -->
 
-## 18. Inspect the assembly apart
+## 18. Preview the exploded assembly
 
 Exploded offsets are presentation metadata. Applying them produces a separate result; it does not change the installed assembly or the print placements. Notice that the cartridge moves as a group and its cam also has a local exploded offset.
 
@@ -798,7 +798,7 @@ References stay out of the manufactured assembly preview. Fetch them explicitly 
 Smith.Kino.render(exploded, label: "Enclosure, covers, service cartridge, and feet")
 ```
 
-## 19. Create drawings from the same geometry
+## 19. Create assembly drawings
 
 The 3D preview is useful for inspecting form. A drawing makes port layout and hidden features easier to compare. These views come from the evaluated tray, so there is no second outline to keep synchronized.
 

@@ -1,10 +1,10 @@
 # Inspect a model as you build it
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
-## What you will learn
+## Overview
 
 A valid solid can still be the wrong shape. Measure evaluated geometry, state the
 requirements explicitly, and keep each report tied to the revision it checked.
@@ -14,7 +14,7 @@ compare removed material, and produce a dimensioned drawing. Read
 [A plate, step by step](plate.livemd) first. A terminal-only version is available
 in `examples/inspection.exs`.
 
-## Name the geometry you want to inspect
+## Named inspection inputs
 
 Names refer to snapshots you supply. They can describe complete parts, intermediate
 stages, or selected subshapes. They do not promise persistent face identities after
@@ -35,7 +35,7 @@ Smith.Kino.render(drilled, view: :top, edges: true)
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-## Query before selecting
+## Topology queries and selectors
 
 Topology inspection returns metadata rather than native handles. Pages include
 source revision, total matches, and the next offset. Native topology order is not
@@ -60,11 +60,11 @@ end
 Kino.DataTable.new(page.items)
 ```
 
-A measurement selector must match exactly one item. An ambiguous match is an
-error, not permission to choose the first edge. Circle centers and radii come
+A measurement selector must match exactly one item. Multiple matches return an
+error; refine the selector to identify one edge. Circle centers and radii come
 from native curves, including arcs; they are not inferred from mesh vertices.
 
-## State requirements and read the result
+## Requirements and reports
 
 ```elixir
 {:ok, report} = Inspection.run(%{plate: drilled}, checks: [
@@ -89,7 +89,7 @@ The JSON contains no native handles. Model summaries include revisions, native
 bounds, area, volume, and topology counts. A text-only agent can use these values
 to decide what to change and rerun the same requirements afterward.
 
-## Find unwanted material and interference
+## Containment and clearance
 
 ```elixir
 ledge = Smith.box(4, 10, 1, at: {38, 7, 5})
@@ -109,16 +109,16 @@ Smith.Kino.render(ledge_scene, edges: true)
 </div>
 
 This reports 20 mm³ outside the plate. Containment measures volume for solids,
-area for faces, and length for curves. Its tolerance uses those units. To catch a
-supported feature, inspect its bottom face against the supporting body: any exposed
-area is useful evidence even when the final union is a valid solid.
+area for faces, and length for curves. Its tolerance uses those units. To check whether a
+feature is fully supported, inspect its bottom face against the supporting body.
+Exposed area indicates an overhang, even when the fused result is a valid solid.
 
 For mating parts, use `{:clearance, :pin, :socket_body, minimum: 0.1,
 tolerance: 1.0e-6}`. It measures material distance and also checks common volume.
 A pin contained inside solid material has zero distance, but that is interference,
 not a successful zero-clearance fit. Linear and volume tolerances are separate.
 
-## Save views and a report
+## Images and report files
 
 ```elixir
 {:ok, artifacts} = Inspection.write(report, "output/inspection",
@@ -164,15 +164,15 @@ Smith.Kino.render(layers, view: :isometric, edges: true)
 The removed material is red and added material green. The same layer list works
 with `Smith.Render.png/2`. These are opaque solids, so orbit or clip the scene to
 inspect occluded regions. Full BREP differences can be expensive for coincident
-curved faces; they are intentionally stronger than comparing total volumes.
+curved faces. They locate changes that a total-volume comparison can miss.
 
-## Put measured dimensions on a drawing
+## Drawing dimensions
 
 ```elixir
 {:ok, drawing} = Drawing.new(drilled, on: :xy)
 {:ok, drawing} = Drawing.dimension(drawing, width, orientation: :horizontal, offset: -6)
 {:ok, drawing} = Drawing.dimension(drawing, spacing, orientation: :horizontal, offset: 18)
-{:ok, drawing} = Drawing.dimension(drawing, diameter, offset: 5)
+{:ok, drawing} = Drawing.dimension(drawing, diameter, offset: -3)
 {:ok, svg} = Drawing.svg(drawing, hidden: false, title: "Measured mounting plate")
 Smith.Kino.render(drawing, label: "Measured mounting plate", hidden: false)
 ```
@@ -195,5 +195,4 @@ from measurements and to return the inspection manifest with its changes.
 
 The [agent modeling guide](https://hexdocs.pm/smith/agent-modeling.html) is available as plain Markdown
 through ExDoc's `llms.txt`. Smith also ships `skills/smith-cad/SKILL.md` for harnesses
-that support skills. Documentation and skills help an agent choose the tools;
-the numerical checks provide evidence that its model meets the requirements.
+that support skills. The guide and skill describe which tools to use and how to check their results.

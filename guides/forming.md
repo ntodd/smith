@@ -1,7 +1,7 @@
 # Forming and cutting
 
-Use planes to define where a cut, cross-section, or taper belongs. Use face selectors
-to choose which surfaces participate. The recipes below remain reusable after each
+Use planes to position cuts, cross-sections, and tapers. Use face selectors
+to choose the surfaces to modify. The recipes below remain reusable after each
 operation; native geometry is built by `Smith.evaluate/1`.
 
 ## Draft about a neutral plane

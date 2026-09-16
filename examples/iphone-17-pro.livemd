@@ -1,10 +1,10 @@
 # Model an iPhone 17 Pro fit dummy
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
-## What we are making
+## The model
 
 A phone-shaped gauge lets you test a case without repeatedly snapping it around an expensive phone. We will build the outside of an iPhone 17 Pro, locate the features a case must accommodate, then prepare two ways to print it: one complete dummy, or two registered halves joined with printed dowels.
 
@@ -22,7 +22,7 @@ The model is not an exact replica or a certified gauge. The drawing supplies use
 
 The printable model represents external shape. It cannot test button actuation, cable retention, camera field of view, MagSafe alignment, radio performance, glass protection, or the real phone's tolerance stack. The small recesses are location witnesses, not working connectors.
 
-## 1. Choose datums and keep a dimension ledger
+## 1. Set the coordinate system and reference dimensions
 
 Look at the **back** of the phone with its cameras at the top. X runs right, Y runs toward the top, and Z comes toward you. The lower-left corner of the nominal rectangular envelope is X=Y=0. The front face is Z=0; the main back face is Z=8.75.
 
@@ -94,9 +94,9 @@ Kino.DataTable.new([
 ])
 ```
 
-## 2. Build a corner with a defined envelope
+## 2. Fit the corner profile to the drawing
 
-A circular fillet is a useful first sketch, but it does not pass through all of Detail A's stations. An interpolating spline passes through them, but can overshoot: with these points and tangent ends, an interpolating spline with these endpoint tangents can extend about 0.01 mm outside the intended coordinate envelope.
+A circular fillet is a useful first sketch, but it does not pass through all of Detail A's stations. An interpolating spline passes through them, but can overshoot: with these points and endpoint tangents, it can extend about 0.01 mm beyond the drawing bounds.
 
 A cubic Bézier has four control points. It touches its first and last points, and its entire curve stays in the convex hull of all four. We will use one cubic between each pair of drawing stations, choosing handles inside that pair's coordinate rectangle. The pieces share tangent vectors. This gives a smooth tangent transition without inventing a single “iPhone corner radius.” It is C1 interpolation, not a reconstruction of Apple's undisclosed curvature law.
 
@@ -205,7 +205,7 @@ Detail B gives inset from the outside wall against signed depth from the phone's
 
 The front and rear roll are different. A box with one fillet radius would erase that difference. Instead, make a series of nested outlines and loft through them. The inset corners shrink toward their tangent intersections; this is our interpolation convention, **not an exact parallel offset** of the outer curve. Only the outer corner contour and the straight-side stations are specified and checked here.
 
-A smooth loft can overshoot between sections. Intersect it with the outer-profile prism and the nominal bounding box. These explicit envelopes prevent the dummy from quietly becoming wider or longer. The interpolation between stations remains an approximation; there is no supplied error bound against the real phone.
+A smooth loft can overshoot between sections. Intersect it with the outer-profile prism and the nominal bounding box. These intersections limit the model to the specified width and length. The interpolation between stations remains an approximation; there is no supplied error bound against the real phone.
 
 ```elixir
 edge_samples = [
@@ -391,7 +391,7 @@ with_controls = camera_result |> Smith.from_result() |> Smith.fuse(buttons) |> S
 Smith.Kino.render(controls_result, label: "Raised buttons and flush Camera Control")
 ```
 
-## 9. Cut the bottom openings and rear witnesses
+## 9. Cut the bottom openings and rear recesses
 
 The bottom view supplies ten acoustic openings and two screw locations. Mirror its front-view X coordinates into our rear-view convention. All twelve centers lie at mid-thickness. The screw centers are 29.00 and 42.85 mm; 31.43 and 40.43 mm mark the USB opening's edges, not screw centers. The USB slot's 9.00 × 3.14 mm opening is distinct from the recommended 12.45 × 6.60 mm connector clearance.
 

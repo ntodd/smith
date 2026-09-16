@@ -1,4 +1,4 @@
-Mix.install([{:smith, "~> 0.2.0"}])
+Mix.install([{:smith, "~> 0.3.0"}])
 
 alias Smith.{Drawing, Inspection, Measure}
 

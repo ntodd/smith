@@ -448,6 +448,18 @@ defmodule Smith do
   def compound(models), do: new(:compound, [models])
 
   @doc """
+  Describes font-backed planar text. Equivalent to `Smith.Text.new/2`.
+
+  Required options are `font: font_snapshot` and `size: em_mm`. See `Smith.Text`
+  for alignment, placement, measured layout reports and fit validation. Extrude
+  the returned text and fuse it into a body for raised lettering, or cut the
+  extrusion from a body for engraving.
+  """
+  @doc group: "Profiles"
+  @spec text(String.t(), keyword()) :: Smith.Text.t()
+  def text(string, opts), do: Smith.Text.new(string, opts)
+
+  @doc """
   Describes a directed straight edge between two world points.
 
   The points must be more than 1.0e-7 mm apart. Use ordered edge recipes
@@ -586,9 +598,13 @@ defmodule Smith do
   """
   @doc group: "Profiles"
   @spec extrude(Smith.Sketch.t(), number()) :: Model.t()
+  @spec extrude(Smith.Text.t(), number()) :: Model.t()
   @spec extrude(Model.t(), {number(), number(), number()}) :: Model.t()
   def extrude(%{__struct__: Smith.Sketch} = sketch, distance),
     do: new(:sketch_extrude, [sketch, distance])
+
+  def extrude(%{__struct__: Smith.Text} = text, distance),
+    do: new(:text_extrude, [text, distance])
 
   def extrude(model, vector), do: append(model, :extrude, [vector])
 
@@ -1089,7 +1105,13 @@ defmodule Smith do
   @spec from_result(Result.t()) :: Model.t()
   def from_result(%Result{} = result), do: new(:from_result, [result])
 
-  @spec evaluate(Model.t() | Smith.Assembly.t() | Smith.Sketch.t() | Smith.Path.t()) ::
+  @spec evaluate(
+          Model.t()
+          | Smith.Assembly.t()
+          | Smith.Sketch.t()
+          | Smith.Path.t()
+          | Smith.Text.t()
+        ) ::
           {:ok, Result.t() | Smith.Assembly.Result.t()} | {:error, Error.t() | atom()}
   @doc """
   Builds native geometry from a model, sketch, or assembly recipe.
@@ -1124,6 +1146,8 @@ defmodule Smith do
   def evaluate(%{__struct__: Smith.Sketch} = sketch), do: evaluate(new(:sketch, [sketch]))
 
   def evaluate(%{__struct__: Smith.Path} = path), do: evaluate(new(:path, [path]))
+
+  def evaluate(%{__struct__: Smith.Text} = text), do: evaluate(new(:text, [text]))
 
   def evaluate(%Model{operations: []}), do: {:error, :empty_model}
 
@@ -1223,6 +1247,11 @@ defmodule Smith do
   end
 
   defp apply_operation(:sketch, nil, [sketch]), do: Smith.Sketch.evaluate(sketch)
+
+  defp apply_operation(:text, nil, [text]), do: Smith.Text.evaluate(text)
+
+  defp apply_operation(:text_extrude, nil, [text, distance]),
+    do: Smith.Text.extrude(text, distance)
 
   defp apply_operation(:sketch_extrude, nil, [sketch, height]),
     do: Smith.Sketch.extrude(sketch, height)

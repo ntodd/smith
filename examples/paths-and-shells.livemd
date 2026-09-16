@@ -1,7 +1,7 @@
 # Paths, smooth lofts, and hollow parts
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## Before you start
@@ -68,7 +68,7 @@ smooth = Smith.loft(sections, ruled: false)
 Smith.Kino.render(smooth, label: "5 · Smooth loft")
 ```
 
-## Put the parts together for inspection
+## Preview the assembly
 
 Named assembly parts retain independent print placement. The positions below spread them out for comparison. They do not fuse the parts.
 

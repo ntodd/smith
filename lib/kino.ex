@@ -105,6 +105,7 @@ defmodule Smith.Kino do
           | Smith.Model.t()
           | Smith.Path.t()
           | Smith.Sketch.t()
+          | Smith.Text.t()
           | Smith.Assembly.t()
           | Smith.Result.t()
           | Smith.Assembly.Result.t()

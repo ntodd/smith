@@ -2,7 +2,7 @@
 
 An assembly names parts and places them relative to one another without fusing
 them. A reference is hardware or another object you need to fit around but will
-not print. Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.2.0"}])`, or in a Livebook.
+not print. Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.3.0"}])`, or in a Livebook.
 
 ```elixir
 alias Smith.Assembly
@@ -184,7 +184,7 @@ Names are preserved in the Elixir result, report, and part filenames. The combin
 
 `files.report` identifies this export; `output/current.json` lists current exports.
 A failed check leaves the previous manifest intact. Run writers to one output
-root sequentially. The [export guide](exporting.md#publication-and-failures)
+root sequentially. The [export guide](exporting.md#file-writes-and-failures)
 explains file placement, atomic updates, and failure recovery.
 
 Continue with [joints and poses](joints.md) for attachment frames and movement, or

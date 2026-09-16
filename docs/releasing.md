@@ -1,7 +1,14 @@
-# Releasing Smith 0.2
+# Releasing Smith 0.3
 
-This repository publishes `smith` version `0.2.0` from tag `v0.2.0`.
-Publish and verify OCEx 0.2 first. Smith's package depends on OCEx from Hex;
+OCEx 0.3 must be released/tagged first. The staged CI checkout targets its
+`v0.3.0` tag; before that tag exists, use an explicit local `OCEX_PATH` for
+development and the built `OCEX_ARCHIVE` for isolated package smoke tests.
+After OCEx is published, run `env -u OCEX_PATH mix deps.update ocex` to refresh
+the public registry lock before verifying the Smith release. Font support adds
+FreeType, HarfBuzz and pkg-config prerequisites on both build and runtime hosts.
+
+This repository publishes `smith` version `0.3.0` from tag `v0.3.0`.
+Publish and verify OCEx 0.3 first. Smith's package depends on OCEx from Hex;
 a path override is only for development.
 
 ## Prepare the source
@@ -14,7 +21,7 @@ a path override is only for development.
 export OCEX_PATH=/absolute/path/to/ocex
 mix deps.get
 make check docs notebooks package
-OCEX_ARCHIVE="$OCEX_PATH/ocex-0.2.0.tar" make package-smoke
+OCEX_ARCHIVE="$OCEX_PATH/ocex-0.3.0.tar" make package-smoke
 ```
 
 `make package` removes the path override when building package metadata. The smoke
@@ -26,8 +33,8 @@ consumer. CI uses the pinned OCEx release commit for the same check.
 4. Create the annotated tag at that verified commit, unless it already exists:
 
 ```sh
-git tag -a v0.2.0 -m "Smith 0.2.0"
-git push origin v0.2.0
+git tag -a v0.3.0 -m "Smith 0.3.0"
+git push origin v0.3.0
 ```
 
 The version, ExDoc source tag, changelog, smoke-test dependency, and public Livebook
@@ -35,7 +42,7 @@ setup must agree. Do not move a published release tag.
 
 ## Publish after OCEx
 
-Run from the tagged checkout after OCEx 0.2 is available on Hex. Authenticate with
+Run from the tagged checkout after OCEx 0.3 is available on Hex. Authenticate with
 `mix hex.user auth` if needed. Clear the local override and resolve the public
 dependency before generating the publication artifacts:
 
@@ -75,7 +82,7 @@ cp scripts/package-smoke.exs "$release_check/model.exs"
 The script checks native geometry, inspection, headless rendering, drawings,
 STEP round trips, and printable exports without Kino. Keep the native toolkit
 installed. Open an unmodified public Livebook to check installation with Kino,
-and inspect [Smith 0.2 HexDocs](https://hexdocs.pm/smith/0.2.0/), including previews,
+and inspect [Smith 0.3 HexDocs](https://hexdocs.pm/smith/0.3.0/), including previews,
 SVG sizing, guide navigation, and source links.
 
 ## Release limits
@@ -86,3 +93,16 @@ by the caller, not every possible design or manufacturing requirement.
 
 Native builds require OCCT 7.9.3. Precompiled NIFs, Windows, hot upgrades, and hard
 cancellation are outside this release. See [errors and limits](../guides/errors-and-limits.md).
+
+## Update published documentation
+
+Documentation can be republished for the current version without changing the
+package version or replacing its archive:
+
+```sh
+mix hex.publish docs --dry-run
+mix hex.publish docs
+```
+
+Review the generated pages before publishing. This updates HexDocs only; changes
+to installed Elixir code or Livebook assets require a new package release.

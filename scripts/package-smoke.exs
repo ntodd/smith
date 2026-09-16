@@ -1,5 +1,16 @@
 # This file is copied out of the repository and run against archive-installed deps.
-Mix.install([{:smith, "~> 0.2.0"}])
+Mix.install([{:smith, "~> 0.3.0"}])
+
+{:ok, font} = Smith.Font.load(Path.join(:code.priv_dir(:smith), "fonts/Graduate-Regular.ttf"))
+text = Smith.text("TEAM", font: font, size: 8, align: {:center, :center}, on: Smith.Plane.xy(z: 1.8))
+{:ok, label} = Smith.Text.validate(text, within: {{-15,-6},{15,6}})
+:passed = label.report.status
+{:ok, _} = Smith.Text.write(label, "output/text-report")
+tag = Smith.Sketch.slot(40,16) |> Smith.extrude(2) |> Smith.fuse(Smith.extrude(text,1))
+{:ok, tag} = Smith.evaluate(tag)
+{:ok, [_]} = OCEx.solids(tag.shape)
+{:ok, _} = Smith.export(tag, "output", name: "archive-text", on_bed: true)
+IO.puts("Verified archive-installed font snapshots, measured text, previews and raised-letter export")
 
 false = Code.ensure_loaded?(Kino)
 true = Code.ensure_loaded?(Smith.Kino)

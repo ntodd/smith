@@ -4,7 +4,7 @@ defmodule Smith.MixProject do
   def project do
     [
       app: :smith,
-      version: "0.2.0",
+      version: "0.3.0",
       elixir: "~> 1.18",
       name: "Smith",
       description:
@@ -14,7 +14,7 @@ defmodule Smith.MixProject do
       deps: deps(),
       aliases: [docs: ["run scripts/build-doc-previews.exs", "docs"]],
       package: [
-        licenses: ["MIT"],
+        licenses: ["MIT", "OFL-1.1"],
         links: %{"GitHub" => "https://github.com/ntodd/smith"},
         files:
           ~w(lib priv guides examples skills llms.txt scripts/build-doc-previews.exs mix.exs .formatter.exs README.md CHANGELOG.md LICENSE)
@@ -34,8 +34,8 @@ defmodule Smith.MixProject do
         before_closing_body_tag: %{
           html: ~s(<script type="module" src="preview/docs.js"></script>)
         },
-        source_ref: "v0.2.0",
-        source_url_pattern: "https://github.com/ntodd/smith/blob/v0.2.0/%{path}#L%{line}",
+        source_ref: "v0.3.0",
+        source_url_pattern: "https://github.com/ntodd/smith/blob/v0.3.0/%{path}#L%{line}",
         extras: [
           "README.md",
           "guides/getting-started.md",
@@ -43,6 +43,7 @@ defmodule Smith.MixProject do
           "guides/livebook.md",
           "guides/modeling.md",
           "guides/sketches.md",
+          "guides/text.md",
           "guides/mechanical-parts.md",
           "guides/extrusion.md",
           "guides/paths-and-shells.md",
@@ -56,6 +57,7 @@ defmodule Smith.MixProject do
           "guides/agent-modeling.md",
           "guides/errors-and-limits.md",
           {"examples/plate.livemd", [filename: "plate-notebook"]},
+          {"examples/text.livemd", [filename: "text-notebook"]},
           {"examples/profiles.livemd", [filename: "profiles-notebook"]},
           {"examples/mechanical-parts.livemd", [filename: "mechanical-parts-notebook"]},
           {"examples/inspection.livemd", [filename: "inspection-notebook"]},
@@ -86,7 +88,7 @@ defmodule Smith.MixProject do
         ],
         groups_for_modules: [
           Modeling: [Smith, Smith.Model, Smith.Result, Smith.Error],
-          Sketches: [Smith.Plane, Smith.Sketch, Smith.Path],
+          Sketches: [Smith.Plane, Smith.Sketch, Smith.Path, Smith.Font, Smith.Text],
           Selection: [Smith.Selector],
           Inspection: [Smith.Inspection, Smith.Measure, Smith.Render],
           Internals: [Smith.Features.Hole, Smith.Assembly.Frame],
@@ -107,7 +109,7 @@ defmodule Smith.MixProject do
     # An explicit opt-in for repository development; published consumers use Hex.
     ocex =
       case System.get_env("OCEX_PATH") do
-        nil -> {:ocex, "~> 0.2.0"}
+        nil -> {:ocex, "~> 0.3.0"}
         path -> {:ocex, path: path}
       end
 

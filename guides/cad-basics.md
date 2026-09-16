@@ -42,8 +42,8 @@ Its **normal** is a perpendicular direction. `Plane.xy()` has a +Z normal, so a
 positive sketch extrusion goes upward. `Plane.xz()` has a −Y normal. The
 [workplane table](sketches.md#frames) gives all three standard orientations.
 
-Sketch coordinates `{u, v}` belong to that workplane. Solid primitive coordinates
-`{x, y, z}` belong to the world. A sketch rectangle is centered by default; a
+Sketch coordinates `{u, v}` use that workplane. Solid primitive coordinates
+`{x, y, z}` use world axes. A sketch rectangle is centered by default; a
 solid box starts at its minimum corner. Use `align:` and `at:` when that
 placement should be explicit.
 
@@ -52,7 +52,7 @@ corner of a board. Keep hole patterns tied to fixed datums. A face's **centroid*
 is its area-weighted center; it can move when material is cut away. That is why
 repeated holes generally use an explicit plane instead of `on: :top`.
 
-## What a shape contains
+## Contents of a shape
 
 | Term | Meaning |
 | --- | --- |
@@ -64,7 +64,7 @@ repeated holes generally use an explicit plane instead of `on: :top`.
 | Solid | An enclosed volume of material |
 | Compound | A collection of shapes that have not been fused together |
 
-These relationships are called **topology**. A selector asks for shapes with
+These relationships are called **topology**. A selector filters shapes by
 properties such as vertical direction, circular geometry, or a particular
 radius. It avoids hard-coding an edge's position in an enumeration. Selections
 must be rebuilt after changes to geometry.
@@ -91,7 +91,7 @@ Fuse, cut, and common are **Boolean operations**. A tool that misses the body
 may leave it unchanged. A successful operation therefore still needs checks
 against the intended design.
 
-## Geometry, pictures, and printed dimensions
+## Geometry, meshes, and print accuracy
 
 Smith evaluates recipes into OCCT **boundary representations**, usually shortened
 to **BREP**. A BREP describes surfaces, curves, and how they meet. Numerical

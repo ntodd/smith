@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.0
+
+- Refine the Livebook and documentation viewer toolbars, clipping controls,
+  and responsive sizing.
+- Add immutable font snapshots and deferred text recipes using OCEx 0.3.
+  Position text on any plane, extrude names and fuse/cut them into parts.
+- Measure actual ink, fit names proportionally, and validate placement/margins
+  and visible height. Reports include font SHA-256, glyph layout and geometry
+  revision, with matched headless PNG and font-independent outline SVG artifacts.
+- Add a text/keychain guide and licensed varsity-style Graduate example font.
+  Native builds now require FreeType, HarfBuzz and pkg-config.
+
 ## 0.2.0
 
 - Reorganize guides and Livebooks into a 0.2 learning path, with CAD terminology,

@@ -87,7 +87,7 @@ Extend cutting tools past the surface when the intended feature is through-all; 
 
 A missed Boolean tool can be a no-op; a missed `hole/2` fails explicitly. Disjoint unions can contain multiple solids. `Smith.compound/1` groups shapes without fusing and preserves separate boundaries. For separately named and printable parts, use [assemblies](assemblies.md).
 
-## Finish the current geometry
+## Fillets and chamfers
 
 ```elixir
 model =
@@ -118,9 +118,9 @@ For reusable selections, compose `Smith.Selector` filters such as `Selector.type
 
 Use `count:` when the design expects a particular number of edges. Unexpected counts fail rather than rounding unintended geometry. Avoid relying on enumeration order; topology can change after booleans and cleanup. Predicates must return booleans, and exceptions in your own callbacks propagate.
 
-Finishing order is part of design intent. Filleting an outside edge before drilling can differ from filleting all edges after drilling. Keep those choices in named feature functions.
+The order of finishing operations affects the result. Filleting an outside edge before drilling can differ from filleting all edges after drilling. Use named functions to make that order clear.
 
-## Place holes deliberately
+## Hole placement
 
 `on: :top` selects the highest outward +Z planar face. Its default hole
 position is the **area centroid of that face**, which can move after a cut.
@@ -182,7 +182,10 @@ rounded_snapshot = snapshot |> Smith.fillet(edges: {:parallel, :z}, radius: 1, c
 <p>Interactive preview available in HexDocs.</p>
 </div>
 
-A snapshot stays fixed until you reevaluate its source. Keep the recipe as the
-editable design. All three original recipes remain independent. Native geometry is immutable too. The evaluated `revision` is a SHA-256 hash of serialized BREP, useful for export identity and detecting stale results. It is not promised to remain identical across kernel versions or platforms, and it is not a parametric editing format. Keep the Elixir recipe as the design source.
+A snapshot contains the geometry from one evaluation. Reevaluating the source
+produces a new snapshot; it does not change the old one. Keep the Elixir recipe
+for editing. The evaluated `revision` is a SHA-256 hash of serialized BREP, used
+to identify exports and detect stale results. The hash can differ across kernel
+versions or platforms.
 
 For measured filters, sorting, topology metadata, mirrored parts, blind holes, and recessed fasteners, see [mechanical parts](mechanical-parts.md).

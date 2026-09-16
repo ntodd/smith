@@ -63,7 +63,7 @@ print_model = files.stl |> File.read!() |> Smith.Mesh.from_stl()
 
 Smaller deflection values generally produce more triangles and larger files. `tolerance:` is not a dimensional offset or printer clearance. Model clearances explicitly in the design. 3MF contains millimeter geometry; it is not a configured printer project.
 
-## What verification checks
+## Export checks
 
 Export first compares the evaluated shape's BREP hash with its stored revision,
 then requires positive volume and at least one solid. Evaluation and the native
@@ -112,7 +112,7 @@ The assembly result produces checked manufactured-part bundles, a geometry-only 
 
 Assembly options are `name:`, `formats:`, `tolerance:`, `angular_tolerance:`, `step_tolerance:`, `metadata:`, and `part_metadata:`. Print and display placement belong on each assembly part, not in these export options. `part_metadata:` maps member names to metadata maps. See [Assemblies](assemblies.md).
 
-## Publication and failures
+## File writes and failures
 
 Files are staged and checked before the root manifest is replaced. A failed export preserves the prior current manifest and all earlier permanent files; it may leave a unique unpublished directory for inspection. Run writers to the same output root sequentially. There is no multi-process publication lock.
 

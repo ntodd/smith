@@ -12,7 +12,7 @@ The runtime executing the notebook needs the toolkit, compiler, and OTP headers.
 For a remote runtime, install them on that machine.
 
 ```elixir
-Mix.install([{:smith, "~> 0.2.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 Run this in the setup cell. Smith brings OCEx in as a dependency. Kino provides
@@ -70,13 +70,15 @@ Rendering errors raise with the failed operation and reason.
 ## Inspect the preview
 
 Drag to orbit and scroll to zoom. **View** chooses a standard orthographic view;
-**Edges** shows native boundaries. **Clipping plane** and its slider reveal
+**Edges** shows native boundaries. Open **Clipping** to choose a plane, move
+the cut with the position slider, or flip the visible side. Clipping reveals
 interior surfaces without modifying or capping geometry. Use `Smith.section/2`
 when you need an actual measurable cross-section.
 
 **Fullscreen** expands the output; **Esc** returns to the notebook. **Download
-PNG** saves the current 3D view. Camera and clipping state belong to each output
-and reset when it is replaced. The renderer uses WebGL in your browser; no
+PNG** saves the current 3D view. The toolbar buttons have tooltips with these
+names. Each output has its own camera and clipping settings, which reset when
+the output is replaced. The renderer uses WebGL in your browser; no
 separate graphics server is needed.
 
 Set the initial view explicitly when it helps explain a feature:
@@ -116,8 +118,9 @@ editing upstream parameters, reevaluate the affected cells in order.
 
 ## Drawings and colored stages
 
-Drawings use the same render entrypoint. They fill the output area and provide
-fullscreen and SVG download; screen sizing does not alter exported millimeters.
+Drawings also use `Smith.Kino.render/2`. The preview fits the complete drawing
+within the output area, with fullscreen and SVG download controls. Display size
+does not change the exported dimensions.
 
 ```elixir
 {:ok, width} = Smith.Measure.extent(result, :x)
@@ -162,13 +165,14 @@ The notebooks are included in the Hex package's `examples/` directory and shown
 in HexDocs. Open their `.livemd` source in Livebook to edit and run the cells.
 Within each group, the order below moves from simpler concepts to larger models.
 
-| Level | Notebook | What you will learn |
+| Level | Notebook | Topics |
 | --- | --- | --- |
 | Start | [A plate](../examples/plate.livemd) | Build, round, drill, measure, export |
 | Start | [Sketches and solid forms](../examples/profiles.livemd) | Extrude a ring, revolve a sleeve, join sections |
 | Start | [Mechanical parts](../examples/mechanical-parts.livemd) | Slots, fastener recesses, selectors, mirrored parts |
 | Inspect | [Inspection](../examples/inspection.livemd) | Measure, detect a failed requirement, compare stages |
 | Inspect | [Drawings](../examples/drawings.livemd) | Views, hidden features, measured SVG dimensions |
+| Personalize | [Text and fonts](../examples/text.livemd) | Font snapshots, measured lettering, fitted keychains |
 | Shape | [Extrusion](../examples/extrusion.livemd) | Symmetric depth, tapered walls, tilted end planes |
 | Shape | [Paths, lofts, and shells](../examples/paths-and-shells.livemd) | A tray, a swept bend, a smooth transition |
 | Shape | [Forming and cutting](../examples/forming.livemd) | Draft, split, section, surface offset, thickening |
