@@ -2,8 +2,10 @@ defmodule Smith.DocPreviewsTest do
   use ExUnit.Case, async: false
   @moduletag :tmp_dir
 
-  # This integration test builds and checks meshes for every documentation example.
-  @tag timeout: 120_000
+  # This aggregate integration test builds every documentation example, including
+  # SVG stroke unions and verified exports. Hosted runners need more than two
+  # minutes for that work; retain all mesh and geometry assertions below.
+  @tag timeout: 600_000
   test "documentation previews mesh the documented stages and assembly poses", %{tmp_dir: output} do
     script = Path.expand("../scripts/build-doc-previews.exs", __DIR__)
     Code.eval_string(File.read!(script), [output: output], file: script)

@@ -35,6 +35,7 @@ defmodule Smith.Drawing do
           | Smith.Model.t()
           | Smith.Sketch.t()
           | Smith.Text.t()
+          | Smith.SVG.t()
           | Smith.Path.t()
           | Assembly.t()
           | Result.t()

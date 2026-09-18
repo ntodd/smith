@@ -70,7 +70,12 @@ hook = DeckClip.hook(dimensions)
 
 The hook section and curve math live in [`DeckClip.Profile`](deck_clip.exs), isolated from feature assembly; geometry evaluation remains explicit in `Smith.evaluate/1`. For this clip, rounding must happen before drilling to preserve the cylindrical holes and counterbore seats. Composition preserves that required order.
 
-`make models` runs both scripts sequentially; `make view` also reloads the shared viewer. `make check` runs the library tests and the assemblies’ ExUnit tests using plain Elixir. OCEx and Smith remain Mix libraries; the assemblies need no project scaffold.
+`make models` runs both scripts and the SVG volleyball keychain example in
+`scripts/svg-keychains.exs` sequentially; `make view` also reloads the shared
+viewer. This regenerates the SVG examples from their current asset snapshots
+instead of leaving older keychains in the viewer manifest. `make check` runs
+the library tests and the assemblies’ ExUnit tests using plain Elixir. OCEx and
+Smith remain Mix libraries; the assemblies need no project scaffold.
 
 ## Print mesh settings
 

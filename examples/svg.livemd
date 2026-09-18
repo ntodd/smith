@@ -1,0 +1,103 @@
+# SVG artwork and a volleyball keychain
+
+```elixir
+Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
+```
+
+## Import artwork
+
+Drop in a local SVG, or leave the upload empty to use Smith's original volleyball.
+Files remain local. The importer snapshots their bytes and never fetches linked
+resources. Unsupported artwork reports the element that needs attention.
+
+```elixir
+alias Smith.{SVG, Font, Text, Sketch, Plane}
+upload = Kino.Input.file("SVG artwork", accept: [".svg"])
+Kino.render(upload)
+# Headless notebook verification uses the same bundled example and defaults.
+read_input = fn input, default ->
+  if Kino.Bridge.within_livebook?(), do: Kino.Input.read(input), else: default
+end
+```
+
+```elixir
+asset_path = case read_input.(upload, nil) do
+  nil -> Path.join(:code.priv_dir(:smith), "svg/volleyball.svg")
+  value -> Kino.Input.file_path(value.file_ref)
+end
+{:ok, artwork} = SVG.load(asset_path)
+IO.inspect(SVG.elements(artwork), label: "Available elements and groups")
+choices = SVG.elements(artwork)
+  |> Enum.flat_map(fn e -> List.wrap(e.id) ++ e.groups end)
+  |> Enum.uniq()
+selection = Kino.Input.select("Artwork", [{:all, "All visible artwork"} | Enum.map(choices, &{&1, &1})])
+mode = Kino.Input.select("Convert", [painted: "Fills and strokes", fill: "Filled outlines", strokes: "Strokes only"])
+width = Kino.Input.number("Artwork width (mm)", default: 18)
+stroke = Kino.Input.number("Override stroke width (mm; 0 preserves source)", default: 0)
+relief = Kino.Input.select("Use artwork as", [engraved: "Engraving", raised: "Raised detail"])
+depth = Kino.Input.number("Relief depth (mm)", default: 0.6)
+name_input = Kino.Input.text("Name", default: "ALEX")
+Kino.Layout.grid([selection, mode, width, stroke, relief, depth, name_input], columns: 2)
+```
+
+## Inspect converted geometry
+
+Choose fills for an outlined icon or strokes for line artwork. The preview is
+actual CAD geometry. Colors do not imply holes. Selecting a group keeps its
+registration relative to the full drawing. Use `reference: :selection` when you
+want to independently fit and center a selected group.
+
+```elixir
+width_mm = read_input.(width, 18)
+stroke_mm = read_input.(stroke, 0)
+relief_mode = read_input.(relief, :engraved)
+depth_mm = read_input.(depth, 0.6)
+if width_mm <= 0 or width_mm > 20, do: raise("Use a width between 0 and 20 mm for this tag")
+if depth_mm <= 0 or depth_mm > 1.5, do: raise("Use a relief depth between 0 and 1.5 mm")
+if stroke_mm < 0, do: raise("Stroke width cannot be negative")
+svg_options = [mode: read_input.(mode, :painted), select: read_input.(selection, :all),
+  width: width_mm, align: {:center, :center}, at: {-20, 0},
+  on: Plane.xy(z: if(relief_mode == :engraved, do: 3, else: 2.8))]
+svg_options = if stroke_mm > 0, do: svg_options ++ [stroke_width: stroke_mm], else: svg_options
+motif = SVG.new(artwork, svg_options)
+{:ok, layout} = SVG.layout(motif)
+IO.inspect(Map.take(layout.report, [:width, :height, :area, :regions, :source_sha256]))
+Smith.Kino.render(layout.result, label: "Converted artwork", view: :top)
+```
+
+## Build the keychain
+
+The base is 3 mm thick. Raised geometry overlaps it by 0.2 mm before fusion.
+The engraving leaves at least 1.5 mm of base material. These are dimensions for
+this example, not automatic printer-specific checks.
+
+```elixir
+{:ok, font} = Font.load(Path.join(:code.priv_dir(:smith), "fonts/Graduate-Regular.ttf"))
+text = Text.new(read_input.(name_input, "ALEX"), font: font, size: 10,
+  align: {:center, :center}, at: {10, 0}, on: Plane.xy(z: 2.8))
+{:ok, text} = Text.fit(text, {38, 15}, margin: 1, min_size: 5)
+letters = Smith.extrude(text, 1)
+base = Sketch.slot(80, 24)
+  |> Sketch.cut(Sketch.circle(2, at: {-34, 0}))
+  |> Smith.extrude(3)
+art = Smith.extrude(motif, if(relief_mode == :engraved, do: -depth_mm, else: depth_mm + 0.2))
+tag = if relief_mode == :engraved, do: Smith.cut(base, art), else: Smith.fuse(base, art)
+tag = Smith.fuse(tag, letters)
+{:ok, result} = Smith.evaluate(tag)
+{:ok, inspection} = Smith.Inspection.run(%{tag: result},
+  checks: [{:topology, :tag, :solids, expected: 1}])
+:passed = inspection.status
+Smith.Kino.render(result, label: "SVG volleyball keychain", edges: true)
+```
+
+## Export this evaluated version
+
+```elixir
+{:ok, previews} = SVG.write(layout, "output/svg-reports")
+{:ok, files} = Smith.export(result, "output/svg-keychains", name: "volleyball", on_bed: true)
+IO.inspect(%{print_file: files.three_mf, artwork_report: previews.report})
+```
+
+For a filled-outline alternative, load `svg/volleyball-outlined.svg` from Smith's
+`priv` directory and use `mode: :fill`. The SVG guide explains supported content,
+source versus final stroke width, viewport sizing, and extracting centerline paths.

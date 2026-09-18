@@ -161,6 +161,10 @@ print orientation.
 
 ## Choose a lesson
 
+The [SVG artwork notebook](../examples/svg.livemd) imports a local SVG, previews its
+CAD regions, and builds a personalized volleyball keychain with raised or
+engraved detail.
+
 The notebooks are included in the Hex package's `examples/` directory and shown
 in HexDocs. Open their `.livemd` source in Livebook to edit and run the cells.
 Within each group, the order below moves from simpler concepts to larger models.

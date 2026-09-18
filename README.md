@@ -50,6 +50,14 @@ and outline SVG previews. Follow [Text and fonts](guides/text.md)
 to build and inspect a personalized keychain. Native installation now also needs
 FreeType, HarfBuzz and pkg-config.
 
+## SVG artwork
+
+Import SVG fills and strokes as CAD regions, size them in millimeters, select
+groups, and extrude raised detail or engraving cutters. SVG assets snapshot
+their source bytes; inspection reports and PNG/filled-SVG previews share the
+converted geometry revision. See [SVG artwork](guides/svg.md) and the
+[volleyball keychain notebook](examples/svg.livemd) for a file-upload workflow.
+
 ## Model inspection
 
 Smith 0.2 includes geometry-derived measurements, named inspection reports,
@@ -160,6 +168,7 @@ alongside printable geometry.
 
 - [Getting started](guides/getting-started.md): scripts, projects, parameters, and the first export.
 - [Modeling](guides/modeling.md): primitives, composition, transformations, selectors, and finishing.
+- [SVG artwork](guides/svg.md): imported fills/strokes, selection, sizing, and engraved or raised motifs.
 - [Sketches and planes](guides/sketches.md): alignment, cutouts, fillets, extrusion, revolve, and loft.
 - [Extrusion extent and taper](guides/extrusion.md): symmetric depth, tapered walls and holes, and tilted end caps.
 - [Curve projection](guides/projection.md): project onto surfaces, inspect multiple hits, and fill planar outlines.
