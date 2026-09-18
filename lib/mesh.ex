@@ -111,11 +111,19 @@ defmodule Smith.Mesh do
 
     adjacency =
       Enum.reduce(edges, %{}, fn {_, uses}, acc ->
-        ids = Enum.map(uses, &elem(&1, 0))
-        Enum.reduce(ids, acc, fn id, acc -> Map.update(acc, id, ids, &(ids ++ &1)) end)
+        # A star connects every triangle using an edge without constructing
+        # a quadratic clique when an edge is nonmanifold.
+        [{first, _} | rest] = uses
+
+        Enum.reduce(rest, acc, fn {id, _}, acc ->
+          acc
+          |> Map.update(first, [id], &[id | &1])
+          |> Map.update(id, [first], &[first | &1])
+        end)
       end)
 
-    remaining = triangles |> Enum.with_index() |> Enum.map(&elem(&1, 1)) |> MapSet.new()
+    ids = triangles |> Enum.with_index() |> Enum.map(&elem(&1, 1))
+    remaining = MapSet.new(ids)
 
     volume =
       Enum.reduce(triangles, 0.0, fn {a, b, c}, total ->
@@ -125,20 +133,19 @@ defmodule Smith.Mesh do
     %{
       watertight: watertight,
       winding_consistent: winding,
-      components: components(remaining, adjacency, 0),
+      components: components(ids, remaining, adjacency, 0),
       volume: volume,
       vertices: length(vertices),
       triangles: length(triangles)
     }
   end
 
-  defp components(remaining, adjacency, count) do
-    if MapSet.size(remaining) == 0 do
-      count
-    else
-      first = Enum.at(remaining, 0)
-      components(visit([first], remaining, adjacency), adjacency, count + 1)
-    end
+  defp components([], _, _, count), do: count
+
+  defp components([id | rest], remaining, adjacency, count) do
+    if MapSet.member?(remaining, id),
+      do: components(rest, visit([id], remaining, adjacency), adjacency, count + 1),
+      else: components(rest, remaining, adjacency, count)
   end
 
   defp visit([], remaining, _), do: remaining
@@ -168,8 +175,15 @@ defmodule Smith.Mesh do
         c = elem(points, c)
         n = cross(subtract(b, a), subtract(c, a))
         length = :math.sqrt(dot(n, n))
-        normal = if length > 0, do: scale(n, 1 / length), else: {0, 0, 0}
-        [float3(normal), float3(a), float3(b), float3(c), <<0::little-16>>]
+        {nx, ny, nz} = if length > 0, do: scale(n, 1 / length), else: {0, 0, 0}
+        {ax, ay, az} = a
+        {bx, by, bz} = b
+        {cx, cy, cz} = c
+
+        <<nx::little-float-32, ny::little-float-32, nz::little-float-32, ax::little-float-32,
+          ay::little-float-32, az::little-float-32, bx::little-float-32, by::little-float-32,
+          bz::little-float-32, cx::little-float-32, cy::little-float-32, cz::little-float-32,
+          0::little-16>>
       end)
 
     IO.iodata_to_binary([:binary.copy(<<0>>, 80), <<length(triangles)::little-32>>, records])
@@ -259,7 +273,6 @@ defmodule Smith.Mesh do
     binary
   end
 
-  defp float3({x, y, z}), do: <<x::little-float-32, y::little-float-32, z::little-float-32>>
   defp read3(<<x::little-float-32, y::little-float-32, z::little-float-32>>), do: {x, y, z}
   defp subtract({a, b, c}, {x, y, z}), do: {a - x, b - y, c - z}
   defp cross({a, b, c}, {x, y, z}), do: {b * z - c * y, c * x - a * z, a * y - b * x}
