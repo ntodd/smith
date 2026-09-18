@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Add immutable SVG assets and deferred artwork recipes, with fills, strokes,
+  holes, group selection, units/transforms, physical fitting, and plane placement.
+- Add geometry-linked SVG reports/previews, filled-outline export, and centerline
+  paths for sweeps/projection. Unsupported visible features return tagged errors.
+- Add an original volleyball asset, equivalent outlined fixture, and interactive
+  file-upload/keychain notebook with raised and engraved variants.
+- Accept SVG compact decimals and retain six licensed upstream icon fixtures
+  with physical sizing, extrusion and engraving regression checks.
+- Requires the accompanying unreleased OCEx planar artwork operations. Use
+  `OCEX_PATH` to test both checkouts until the next coordinated package release.
+
 ## 0.3.0
 
 - Refine the Livebook and documentation viewer toolbars, clipping controls,

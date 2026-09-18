@@ -27,6 +27,7 @@ package-smoke:
 models:
 	elixir models/plant_stand.exs
 	elixir models/deck_clip.exs
+	mix run scripts/svg-keychains.exs
 
 view: models
 	node scripts/view.mjs

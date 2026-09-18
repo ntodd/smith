@@ -34,7 +34,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ntodd/ocex
-          ref: v0.3.0
+          # Companion SVG planar-artwork implementation; pin until its release.
+          ref: 57f740132af4b6e71b175ebdcacb44aed24a5a64
           path: .ci/ocex
       - name: Use staged OCEx
         if: ${{ !inputs.published_ocex }}

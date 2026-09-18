@@ -23,3 +23,5 @@ browser or GPU. Check report.status, not just the outer {:ok, report} tuple.
 - [Headless rendering](https://hexdocs.pm/smith/Smith.Render.md): standard PNG views and colored stages.
 - [Drawings](https://hexdocs.pm/smith/Smith.Drawing.md): orthographic SVG/DXF and measured SVG annotations.
 - [OCEx](https://hexdocs.pm/ocex/llms.txt): native geometry contracts and installation.
+
+- [SVG artwork](https://hexdocs.pm/smith/svg.html): snapshot SVG fills/strokes, select groups, fit in mm, and extrude raised or engraved motifs.

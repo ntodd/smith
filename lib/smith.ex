@@ -460,6 +460,16 @@ defmodule Smith do
   def text(string, opts), do: Smith.Text.new(string, opts)
 
   @doc """
+  Describes imported SVG artwork. Equivalent to `Smith.SVG.new/2`.
+  Load an immutable asset with `Smith.SVG.load/1` or `Smith.SVG.from_binary/1`,
+  then choose fills/strokes, millimeter sizing, selection and plane placement.
+  Scalar extrusion follows the artwork plane normal.
+  """
+  @doc group: "Profiles"
+  @spec svg(Smith.SVG.Asset.t(), keyword()) :: Smith.SVG.t()
+  def svg(asset, opts \\ []), do: Smith.SVG.new(asset, opts)
+
+  @doc """
   Describes a directed straight edge between two world points.
 
   The points must be more than 1.0e-7 mm apart. Use ordered edge recipes
@@ -532,8 +542,9 @@ defmodule Smith do
       ...>   Smith.line({0, 3, 0}, {0, 0, 0})
       ...> ]
       iex> {:ok, face} = Smith.profile(outline) |> Smith.evaluate()
-      iex> OCEx.area(face.shape)
-      {:ok, 6.0}
+      iex> {:ok, area} = OCEx.area(face.shape)
+      iex> Float.round(area, 6)
+      6.0
 
   <div class="smith-doc-preview" data-preview="api-smith-6" data-model="face" data-label="Triangular profile">
   <p>Interactive preview available in HexDocs.</p>
@@ -585,7 +596,7 @@ defmodule Smith do
   within the face plane fails with `:degenerate_extrusion`. Native length
   tolerances also apply. Each face produces its own solid; results are not
   fused. This supports disconnected regions from `section/2`. A scalar
-  distance is only supported for sketches.
+  distance follows the local plane normal for sketches, text and SVG artwork.
 
       iex> model = Smith.Sketch.rectangle(4, 6) |> Smith.extrude(-2)
       iex> {:ok, part} = Smith.evaluate(model)
@@ -599,12 +610,16 @@ defmodule Smith do
   @doc group: "Profiles"
   @spec extrude(Smith.Sketch.t(), number()) :: Model.t()
   @spec extrude(Smith.Text.t(), number()) :: Model.t()
+  @spec extrude(Smith.SVG.t(), number()) :: Model.t()
   @spec extrude(Model.t(), {number(), number(), number()}) :: Model.t()
   def extrude(%{__struct__: Smith.Sketch} = sketch, distance),
     do: new(:sketch_extrude, [sketch, distance])
 
   def extrude(%{__struct__: Smith.Text} = text, distance),
     do: new(:text_extrude, [text, distance])
+
+  def extrude(%{__struct__: Smith.SVG} = svg, distance),
+    do: new(:svg_extrude, [svg, distance])
 
   def extrude(model, vector), do: append(model, :extrude, [vector])
 
@@ -1111,6 +1126,7 @@ defmodule Smith do
           | Smith.Sketch.t()
           | Smith.Path.t()
           | Smith.Text.t()
+          | Smith.SVG.t()
         ) ::
           {:ok, Result.t() | Smith.Assembly.Result.t()} | {:error, Error.t() | atom()}
   @doc """
@@ -1148,6 +1164,8 @@ defmodule Smith do
   def evaluate(%{__struct__: Smith.Path} = path), do: evaluate(new(:path, [path]))
 
   def evaluate(%{__struct__: Smith.Text} = text), do: evaluate(new(:text, [text]))
+
+  def evaluate(%{__struct__: Smith.SVG} = svg), do: evaluate(new(:svg, [svg]))
 
   def evaluate(%Model{operations: []}), do: {:error, :empty_model}
 
@@ -1249,6 +1267,11 @@ defmodule Smith do
   defp apply_operation(:sketch, nil, [sketch]), do: Smith.Sketch.evaluate(sketch)
 
   defp apply_operation(:text, nil, [text]), do: Smith.Text.evaluate(text)
+
+  defp apply_operation(:svg, nil, [svg]), do: Smith.SVG.evaluate(svg)
+
+  defp apply_operation(:svg_extrude, nil, [svg, distance]),
+    do: Smith.SVG.extrude(svg, distance)
 
   defp apply_operation(:text_extrude, nil, [text, distance]),
     do: Smith.Text.extrude(text, distance)

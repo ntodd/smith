@@ -44,6 +44,7 @@ defmodule Smith.MixProject do
           "guides/modeling.md",
           "guides/sketches.md",
           "guides/text.md",
+          "guides/svg.md",
           "guides/mechanical-parts.md",
           "guides/extrusion.md",
           "guides/paths-and-shells.md",
@@ -58,6 +59,7 @@ defmodule Smith.MixProject do
           "guides/errors-and-limits.md",
           {"examples/plate.livemd", [filename: "plate-notebook"]},
           {"examples/text.livemd", [filename: "text-notebook"]},
+          {"examples/svg.livemd", [filename: "svg-notebook"]},
           {"examples/profiles.livemd", [filename: "profiles-notebook"]},
           {"examples/mechanical-parts.livemd", [filename: "mechanical-parts-notebook"]},
           {"examples/inspection.livemd", [filename: "inspection-notebook"]},
@@ -88,7 +90,15 @@ defmodule Smith.MixProject do
         ],
         groups_for_modules: [
           Modeling: [Smith, Smith.Model, Smith.Result, Smith.Error],
-          Sketches: [Smith.Plane, Smith.Sketch, Smith.Path, Smith.Font, Smith.Text],
+          Sketches: [
+            Smith.Plane,
+            Smith.Sketch,
+            Smith.Path,
+            Smith.Font,
+            Smith.Text,
+            Smith.SVG,
+            Smith.SVG.Asset
+          ],
           Selection: [Smith.Selector],
           Inspection: [Smith.Inspection, Smith.Measure, Smith.Render],
           Internals: [Smith.Features.Hole, Smith.Assembly.Frame],

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="100mm" viewBox="0 0 100 100">
+  <title>Original three-sector volleyball motif</title>
+  <g id="volleyball" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle id="rim" cx="50" cy="50" r="45"/>
+    <g id="seams">
+      <g id="sector">
+        <path d="M50 50 C64 44 75 27 72.5 11.0288568"/>
+        <path d="M63.147312500 40.173237235 C75 42 85 36 91.87 33.51"/>
+        <path d="M70.613937500 27.660924799 C80 30 85 26 87.84 25.65"/>
+      </g>
+      <use href="#sector" transform="rotate(120 50 50)"/>
+      <use href="#sector" transform="rotate(240 50 50)"/>
+    </g>
+  </g>
+</svg>
