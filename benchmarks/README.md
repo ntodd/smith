@@ -123,3 +123,7 @@ measure concurrent throughput, peak memory, STEP file I/O, or browser rendering
 performance. Native meshing remains a substantial cost in checked exports;
 changing its copy/ownership strategy would need a separate concurrency and
 immutability investigation. Timing thresholds are deliberately not tests.
+
+The subsequent [CAD modeling investigation](CAD_MODELING.md) measures Boolean
+operations, fillets, model rebuilds, precise measurements, and reuse separately
+from these mesh-processing results.

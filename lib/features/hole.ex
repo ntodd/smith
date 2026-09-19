@@ -25,7 +25,7 @@ defmodule Smith.Features.Hole do
   returned without a `Smith.Error` wrapper; the recipe evaluator adds
   its operation and step context.
 
-  Through-all cutters span the projected body bounds with a 1 mm margin
+  Through-all cutters span a projected enclosing box with a 1 mm margin
   at each end. Finite cutters start at the entry plane and extend into its
   negative normal. Material removal must exceed 1.0e-9 mm³ for each cut;
   otherwise the reason is `:hole_misses_body` or `:recess_misses_body`.
@@ -33,10 +33,18 @@ defmodule Smith.Features.Hole do
   @spec evaluate(OCEx.Shape.t(), :hole | :counterbore | :countersink, keyword()) ::
           {:ok, OCEx.Shape.t()} | {:error, atom()}
   def evaluate(body, kind, opts) do
+    with {:ok, result, _bounds} <- evaluate(body, kind, opts, nil), do: {:ok, result}
+  end
+
+  # The recipe evaluator retains this envelope only across hole features.
+  # Subtraction cannot extend it. Face selection still uses the current body.
+  @doc false
+  def evaluate(body, kind, opts, bounds) do
     with :ok <- validate(kind, opts),
-         {:ok, tool} <- pilot(body, opts),
+         {:ok, tool, bounds} <- pilot(body, opts, bounds),
          {:ok, drilled} <- remove(body, tool, :hole_misses_body),
-         do: recess(drilled, body, kind, opts)
+         {:ok, result} <- recess(drilled, body, kind, opts),
+         do: {:ok, result, bounds}
   end
 
   defp validate(kind, opts) do
@@ -91,13 +99,14 @@ defmodule Smith.Features.Hole do
       (opts[:sink_diameter] - opts[:diameter]) / 2 /
         :math.tan(Keyword.get(opts, :angle, 90) * :math.pi() / 360)
 
-  defp pilot(body, opts) do
+  defp pilot(body, opts, bounds) do
     if opts[:through] == :all do
-      hole_tool(body, opts)
+      hole_tool(body, opts, bounds)
     else
       with {:ok, frame} <- entry(body, opts),
            {:ok, tool} <- OCEx.cylinder(opts[:diameter] / 2, opts[:depth]),
-           do: below(tool, frame, opts[:depth])
+           {:ok, tool} <- below(tool, frame, opts[:depth]),
+           do: {:ok, tool, bounds}
     end
   end
 
@@ -138,26 +147,48 @@ defmodule Smith.Features.Hole do
       Plane.place(tool, %{frame | origin: Plane.add(frame.origin, Plane.scale(frame.n, -depth))})
 
   defp remove(body, tool, reason) do
+    # Measure only the removed region. Integrating the two entire bodies
+    # repeats expensive curved-surface work and subtracts nearly equal masses.
+    # Keep the same native validity checks, integration accuracy and threshold.
     with {:ok, result} <- OCEx.cut(body, tool),
-         {:ok, before_volume} <- OCEx.volume(body),
-         {:ok, after_volume} <- OCEx.volume(result) do
-      if before_volume - after_volume > 1.0e-9, do: {:ok, result}, else: {:error, reason}
+         {:ok, removed} <- OCEx.common(body, tool),
+         {:ok, removed_volume} <- OCEx.volume(removed) do
+      if removed_volume > 1.0e-9, do: {:ok, result}, else: {:error, reason}
     end
   end
 
-  defp hole_tool(body, opts) do
+  defp envelope(body, nil) do
+    # Exact extrema are unnecessary for cutter reach. Older OCEx releases
+    # retain the precise-bounds path without changing recipe behavior.
+    if Code.ensure_loaded?(OCEx.Internal) and function_exported?(OCEx.Internal, :envelope, 1),
+      do: apply(OCEx.Internal, :envelope, [body]),
+      else: OCEx.bounds(body)
+  end
+
+  defp envelope(body, bounds) do
+    # Complete removal must still report the same empty-shape failure that
+    # measuring the current body's bounds would report.
+    case OCEx.vertices(body) do
+      {:ok, []} -> {:error, :empty_shape}
+      {:ok, [_ | _]} -> {:ok, bounds}
+      error -> error
+    end
+  end
+
+  defp hole_tool(body, opts, bounds) do
     if opts[:on] == :top do
       with {:ok, face} <- top_face(body),
-           {:ok, {{_, _, bottom}, {_, _, top}}} <- OCEx.bounds(body),
+           {:ok, {{_, _, bottom}, {_, _, top}} = bounds} <- envelope(body, bounds),
            {:ok, tool} <- OCEx.cylinder(opts[:diameter] / 2, top - bottom + 2),
            {cx, cy, _} = face.center,
            {dx, dy} = Keyword.get(opts, :at, {0, 0}),
-           do: OCEx.translate(tool, {cx + dx, cy + dy, bottom - 1})
+           {:ok, tool} <- OCEx.translate(tool, {cx + dx, cy + dy, bottom - 1}),
+           do: {:ok, tool, bounds}
     else
       alias Smith.Plane
 
       with {:ok, frame} <- Plane.frame(opts[:on]),
-           {:ok, {low, high}} <- OCEx.bounds(body) do
+           {:ok, {low, high} = bounds} <- envelope(body, bounds) do
         center = Plane.point(frame, Keyword.get(opts, :at, {0, 0}))
 
         distances =
@@ -170,11 +201,12 @@ defmodule Smith.Features.Hole do
         height = Enum.max(distances) + 1 - bottom
 
         with {:ok, tool} <- OCEx.cylinder(opts[:diameter] / 2, height),
-             do:
+             {:ok, tool} <-
                Plane.place(tool, %{
                  frame
                  | origin: Plane.add(center, Plane.scale(frame.n, bottom))
-               })
+               }),
+             do: {:ok, tool, bounds}
       end
     end
   end
