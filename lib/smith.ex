@@ -1175,10 +1175,11 @@ defmodule Smith do
   error atom. Empty models return `:empty_model`; unsupported top-level
   terms return `:invalid_recipe`.
 
-  Evaluation is synchronous. It rebuilds a recipe on each call, except that
-  equal member recipes within one assembly evaluation share their base
-  evaluation. Use `from_result/1` to reuse an evaluated stage across branches
-  or calls without rebuilding its source operations. User callback exceptions are not caught. See the
+  Evaluation is synchronous. Compatible Boolean runs are grouped automatically;
+  repeated self-contained geometry is reused within the call, including copies
+  with different placements. Callback-containing recipes are not memoized.
+  Reuse ends with the evaluation; `from_result/1` retains an evaluated stage
+  across calls without rebuilding its source operations. User callback exceptions are not caught. See the
   [error guide](errors-and-limits.html) for details.
 
       iex> Smith.box(0, 10, 4) |> Smith.evaluate()
@@ -1199,8 +1200,8 @@ defmodule Smith do
 
   def evaluate(%Model{operations: []}), do: {:error, :empty_model}
 
-  def evaluate(%Model{operations: operations}) do
-    operations |> evaluate_operations() |> finish()
+  def evaluate(%Model{} = model) do
+    Smith.EvaluationCache.with_scope(model, fn -> model |> evaluate_shape() |> finish() end)
   end
 
   def evaluate(_), do: {:error, :invalid_recipe}
@@ -1209,7 +1210,31 @@ defmodule Smith do
   # Result that the parent immediately discards. Native operations still
   # validate their outputs, and the public evaluation boundary calls finish/1.
   defp evaluate_shape(%Model{operations: []}), do: {:error, :empty_model}
-  defp evaluate_shape(%Model{operations: operations}), do: evaluate_operations(operations)
+
+  defp evaluate_shape(%Model{} = model) do
+    {base, placements} = Smith.EvaluationPlan.placement_base(model)
+
+    if Smith.EvaluationCache.candidate?(base) do
+      with {:ok, shape} <-
+             Smith.EvaluationCache.fetch(base, fn -> evaluate_operations(base.operations) end) do
+        placements
+        |> Enum.reverse()
+        |> Enum.with_index(length(base.operations) + 1)
+        |> Enum.reduce_while({:ok, shape, nil}, fn node, context ->
+          case evaluate_node(node, context) do
+            {:ok, _, _} = next -> {:cont, next}
+            error -> {:halt, error}
+          end
+        end)
+        |> case do
+          {:ok, placed, _} -> {:ok, placed}
+          error -> error
+        end
+      end
+    else
+      evaluate_operations(model.operations)
+    end
+  end
 
   defp evaluate_shape(recipe) do
     with {:ok, result} <- evaluate(recipe), do: {:ok, result.shape}
@@ -1232,20 +1257,41 @@ defmodule Smith do
 
   defp evaluate_group([node], context), do: evaluate_node(node, context)
 
+  defp evaluate_group([{{op, _}, _} | _] = nodes, {:ok, body, envelope} = context)
+       when op in [:hole, :counterbore, :countersink] do
+    features = Enum.map(nodes, fn {feature, _} -> feature end)
+    result = speculative(fn -> Smith.Features.Hole.evaluate_batch(body, features, envelope) end)
+    recover_group(result, nodes, context)
+  end
+
   defp evaluate_group([{{operation, _}, _} | _] = nodes, {:ok, body, _} = context) do
     native = if operation == :cut, do: :cut_many, else: :fuse_many
     tools = Enum.map(nodes, fn {{_, [tool]}, _} -> tool end)
 
     result =
-      if Code.ensure_loaded?(OCEx) and function_exported?(OCEx, native, 2) do
-        with {:ok, shapes} <- evaluate_edges(tools),
-             {:ok, result} <- apply(OCEx, native, [body, shapes]),
-             {:ok, result} <- OCEx.clean(result),
-             do: {:ok, result, nil}
-      else
-        :sequential
-      end
+      speculative(fn ->
+        if Code.ensure_loaded?(OCEx) and function_exported?(OCEx, native, 2) do
+          with {:ok, shapes} <- evaluate_edges(tools),
+               {:ok, result} <- apply(OCEx, native, [body, shapes]),
+               {:ok, result} <- OCEx.clean(result),
+               do: {:ok, result, nil}
+        else
+          :sequential
+        end
+      end)
 
+    recover_group(result, nodes, context)
+  end
+
+  defp speculative(fun) do
+    fun.()
+  rescue
+    # Only callback-free optimization attempts run here. Replay outside this
+    # rescue so the original first failure (including an exception) survives.
+    _ -> :sequential
+  end
+
+  defp recover_group(result, nodes, context) do
     case result do
       {:ok, _, _} ->
         result
@@ -1561,13 +1607,14 @@ defmodule Smith do
          offset =
            0..2
            |> Enum.map(&(-anchor(elem(low, &1), elem(high, &1), elem(alignment, &1))))
-           |> List.to_tuple(),
-         {:ok, aligned} <- shift(shape, offset) do
-      shift(aligned, at)
+           |> List.to_tuple() do
+      shift(shape, Smith.Plane.add(offset, at))
     else
       false -> {:error, :invalid_options}
       error -> error
     end
+  rescue
+    ArithmeticError -> {:error, :invalid_argument}
   end
 
   defp point3?({x, y, z}), do: is_number(x) and is_number(y) and is_number(z)

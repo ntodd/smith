@@ -1,5 +1,9 @@
 # CAD modeling performance investigation — 2026-09-19
 
+The subsequent [compiler optimization report](COMPILER_OPTIMIZATIONS.md) covers
+automatic subrecipe reuse, independent-hole batching, shared intersections,
+selective OCCT parallelism, and the final build123d comparison.
+
 ## Automatic evaluation follow-up
 
 The final evaluator now optimizes ordinary recipes without new caller options

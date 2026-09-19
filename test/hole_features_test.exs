@@ -2,6 +2,85 @@ defmodule Smith.HoleFeaturesTest do
   use ExUnit.Case, async: true
   alias Smith.Plane
 
+  test "speculative preparation cannot replace an earlier feature error with a later exception" do
+    assert {:error, %Smith.Error{step: 2, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(60, 16, 10)
+             |> Smith.hole(on: Plane.xy(), at: {100, 8}, diameter: 4, through: :all)
+             |> Smith.hole(on: Plane.xy(), at: {30, 8}, diameter: 4, through: :all)
+             |> Smith.countersink(
+               on: Plane.xy(),
+               at: {50, 8},
+               diameter: 4,
+               sink_diameter: Integer.pow(10, 400),
+               through: :all
+             )
+             |> Smith.evaluate()
+  end
+
+  test "independent explicit-plane hole features match sequential snapshots" do
+    source = Smith.box(60, 16, 10)
+
+    features = [
+      {:hole, [on: Plane.xy(z: 10), at: {10, 8}, diameter: 4, through: :all]},
+      {:counterbore,
+       [
+         on: Plane.xy(z: 10),
+         at: {30, 8},
+         diameter: 4,
+         bore_diameter: 8,
+         bore_depth: 3,
+         through: :all
+       ]},
+      {:countersink,
+       [on: Plane.xy(z: 10), at: {50, 8}, diameter: 4, sink_diameter: 8, through: :all]}
+    ]
+
+    together =
+      Enum.reduce(features, source, fn {op, opts}, model -> apply(Smith, op, [model, opts]) end)
+
+    separate =
+      Enum.reduce(features, source, fn {op, opts}, model ->
+        {:ok, result} = apply(Smith, op, [model, opts]) |> Smith.evaluate()
+        Smith.from_result(result)
+      end)
+
+    {:ok, a} = Smith.evaluate(together)
+    {:ok, b} = Smith.evaluate(separate)
+
+    for {left, right} <- [{a.shape, b.shape}, {b.shape, a.shape}] do
+      assert {:ok, delta} = OCEx.cut(left, right)
+      assert {:ok, amount} = OCEx.volume(delta)
+      assert_in_delta amount, 0, 1.0e-7
+    end
+  end
+
+  test "overlapping hole runs retain per-feature misses and original indices" do
+    opts = [on: Plane.xy(), at: {5, 5}, diameter: 2, through: :all]
+
+    assert {:error, %Smith.Error{step: 4, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(20, 10, 3)
+             |> Smith.hole(opts)
+             |> Smith.hole(Keyword.put(opts, :at, {15, 5}))
+             |> Smith.hole(opts)
+             |> Smith.evaluate()
+  end
+
+  test "independent batch validation recovers a later recess miss at its original step" do
+    assert {:error, %Smith.Error{step: 4, operation: :counterbore, reason: :recess_misses_body}} =
+             Smith.box(60, 16, 10)
+             |> Smith.hole(on: Plane.xy(), at: {10, 8}, diameter: 4, through: :all)
+             |> Smith.hole(on: Plane.xy(), at: {30, 8}, diameter: 4, through: :all)
+             |> Smith.counterbore(
+               on: Plane.xy(z: 20),
+               at: {50, 8},
+               diameter: 4,
+               bore_diameter: 8,
+               bore_depth: 2,
+               through: :all
+             )
+             |> Smith.evaluate()
+  end
+
   defp volume(recipe, expected) do
     assert {:ok, result} = Smith.evaluate(recipe)
     assert {:ok, true} = OCEx.valid?(result.shape)

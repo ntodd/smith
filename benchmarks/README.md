@@ -1,5 +1,9 @@
 # Performance review
 
+For the latest modeling results, see [automatic compiler optimizations](COMPILER_OPTIMIZATIONS.md),
+including the build123d comparison. The measurements below describe the earlier
+mesh-processing work.
+
 Run from the Smith repository with the sibling OCEx checkout explicitly selected:
 
 ```sh

@@ -47,6 +47,90 @@ defmodule Smith.Features.Hole do
          do: {:ok, result, bounds}
   end
 
+  # Only explicit-plane features reach this path. Prove that their complete
+  # cutter envelopes are disjoint before validating them against the same body.
+  # Any uncertainty or failure sends the original nodes back to sequential
+  # evaluation, preserving per-feature errors and their original indices.
+  @doc false
+  def evaluate_batch(body, features, bounds) do
+    if Code.ensure_loaded?(OCEx) and function_exported?(OCEx, :cut_many, 2) do
+      with {:ok, prepared, bounds} <- prepare_batch(body, features, bounds),
+           true <- independent?(prepared),
+           :ok <- check_batch(body, prepared),
+           tools =
+             Enum.flat_map(prepared, fn {pilot, recess, _} ->
+               if recess, do: [pilot, recess], else: [pilot]
+             end),
+           {:ok, result} <- apply(OCEx, :cut_many, [body, tools]),
+           do: {:ok, result, bounds}
+    else
+      :sequential
+    end
+  end
+
+  defp prepare_batch(body, features, bounds) do
+    Enum.reduce_while(features, {:ok, [], bounds}, fn {kind, opts}, {:ok, acc, bounds} ->
+      with :ok <- validate(kind, opts),
+           {:ok, pilot, bounds} <- pilot(body, opts, bounds),
+           {:ok, recess} <- prepared_recess(body, kind, opts),
+           {:ok, box} <- cutter_bounds(pilot, recess) do
+        {:cont, {:ok, acc ++ [{pilot, recess, box}], bounds}}
+      else
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp prepared_recess(_, :hole, _), do: {:ok, nil}
+
+  defp prepared_recess(body, kind, opts) do
+    with {:ok, frame} <- entry(body, opts),
+         {:ok, tool, depth} <- recess_tool(kind, opts),
+         do: below(tool, frame, depth)
+  end
+
+  defp cutter_bounds(pilot, nil), do: envelope(pilot, nil)
+
+  defp cutter_bounds(pilot, recess) do
+    with {:ok, {a, b}} <- envelope(pilot, nil),
+         {:ok, {c, d}} <- envelope(recess, nil) do
+      low = for i <- 0..2, do: min(elem(a, i), elem(c, i))
+      high = for i <- 0..2, do: max(elem(b, i), elem(d, i))
+      {:ok, {List.to_tuple(low), List.to_tuple(high)}}
+    end
+  end
+
+  defp independent?([]), do: true
+
+  defp independent?([{_, _, {low, high}} | rest]) do
+    Enum.all?(rest, fn {_, _, {other_low, other_high}} ->
+      Enum.any?(0..2, fn i ->
+        elem(high, i) < elem(other_low, i) or elem(other_high, i) < elem(low, i)
+      end)
+    end) and independent?(rest)
+  end
+
+  defp check_batch(body, prepared) do
+    Enum.reduce_while(prepared, :ok, fn {pilot, recess, _}, :ok ->
+      with {:ok, removed} <- OCEx.common(body, pilot),
+           {:ok, volume} when volume > 1.0e-9 <- OCEx.volume(removed),
+           :ok <- check_recess(body, pilot, recess) do
+        {:cont, :ok}
+      else
+        _ -> {:halt, :sequential}
+      end
+    end)
+  end
+
+  defp check_recess(_, _, nil), do: :ok
+
+  defp check_recess(body, pilot, recess) do
+    with {:ok, region} <- OCEx.common(body, recess),
+         {:ok, added} <- OCEx.cut(region, pilot),
+         {:ok, volume} when volume > 1.0e-9 <- OCEx.volume(added),
+         do: :ok
+  end
+
   defp validate(kind, opts) do
     extra =
       case kind do
@@ -150,10 +234,19 @@ defmodule Smith.Features.Hole do
     # Measure only the removed region. Integrating the two entire bodies
     # repeats expensive curved-surface work and subtracts nearly equal masses.
     # Keep the same native validity checks, integration accuracy and threshold.
-    with {:ok, result} <- OCEx.cut(body, tool),
-         {:ok, removed} <- OCEx.common(body, tool),
-         {:ok, removed_volume} <- OCEx.volume(removed) do
+    with {:ok, result, removed_volume} <- cut_removed(body, tool) do
       if removed_volume > 1.0e-9, do: {:ok, result}, else: {:error, reason}
+    end
+  end
+
+  defp cut_removed(body, tool) do
+    if Code.ensure_loaded?(OCEx.Internal) and function_exported?(OCEx.Internal, :cut_removed, 2) do
+      apply(OCEx.Internal, :cut_removed, [body, tool])
+    else
+      with {:ok, result} <- OCEx.cut(body, tool),
+           {:ok, removed} <- OCEx.common(body, tool),
+           {:ok, volume} <- OCEx.volume(removed),
+           do: {:ok, result, volume}
     end
   end
 

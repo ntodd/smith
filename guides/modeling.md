@@ -79,18 +79,23 @@ operations automatically.
 
 Hole features also avoid repeatedly measuring the whole part. Through-holes
 reuse an enclosing box within a consecutive run, while `on: :top` placement
-still follows the current face centroid after each cut. No optimization options
-or recipe rewrites are needed.
+still follows the current face centroid after each cut. Runs of explicit-plane
+holes are batched when their complete cutter envelopes are disjoint. Overlapping
+cutters and body-dependent placement keep sequential behavior, including the
+checks that pilots and recesses remove material. No optimization options or
+recipe rewrites are needed.
 
 `Smith.cut_many/2` and `Smith.fuse_many/2` explicitly request a single native
 batch, including tools that automatic planning treats as boundaries. These
 advanced operations require OCEx batch support and can report different
 failure steps. Ordinary recipes do not need them for automatic optimization.
 
-For repeated copies of an expensive subassembly, evaluate it once and pass its
-result through `Smith.from_result/1` before applying each placement. This makes
-reuse explicit and preserves revision checks; ordinary recipe evaluation does
-not cache callbacks or assume they are free of side effects.
+Repeated, self-contained subrecipes are automatically evaluated once within an
+evaluation, including parts that differ only by translation, rotation or mirror.
+Reuse is bounded and ends when evaluation returns or raises. Recipes containing
+callbacks or retained snapshots are not memoized; nested evaluations have their
+own scope. `Smith.from_result/1` remains useful for explicitly retaining geometry
+across separate evaluations, with revision checks intact.
 
 A Boolean combines the material occupied by shapes. A boss is a raised pad, often
 used around a fastener; a bore is a cylindrical opening.
