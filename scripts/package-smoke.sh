@@ -11,7 +11,7 @@ if [ -n "${OCEX_ARCHIVE:-}" ]; then
   ocex_version=${archive_name#ocex-}
   ocex_version=${ocex_version%.tar}
 else
-  ocex_version=$(elixir -e '{lock, _} = Code.eval_file("mix.lock"); IO.write(elem(Map.fetch!(lock, "ocex"), 2))')
+  ocex_version=$(elixir -e '{lock, _} = Code.eval_file("mix.lock"); IO.write(elem(Map.fetch!(lock, :ocex), 2))')
 fi
 work=$(mktemp -d)
 server_pid=
