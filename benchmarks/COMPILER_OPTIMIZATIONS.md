@@ -107,10 +107,9 @@ guarantee for every shape or machine.
 
 Independent Elixir evaluations still serialize at the native mutex. Removing it
 without isolating OCCT mutable state and shape caches would not be justified by
-these tests. Further promising work includes isolated kernel workers for
-independent models, sharing intersection preparation across an entire checked
-hole batch, composing long transform chains into one native transform, and
-document-scoped incremental caching with explicit invalidation and ownership.
+these tests. Sharing intersection preparation across an entire checked hole
+batch remains a possible optimization. Subsequent transform fusion and
+incremental caching are covered in the follow-up report linked above.
 
 ## Verification
 

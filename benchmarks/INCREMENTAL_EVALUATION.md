@@ -1,4 +1,4 @@
-# Incremental evaluation, transform fusion, and isolated kernels
+# Incremental evaluation and transform fusion
 
 Follow-up to Smith `247e54f` and OCEx `3991368`. All retained changes work through
 ordinary recipes and `Smith.evaluate/1`; no public recipe options are added.
@@ -66,39 +66,7 @@ not be presented as the cost of constructing new geometry. See
 The preceding build123d comparison remains a comparison of rebuilds, not cache
 hits; its Python timings have not been reclassified or compared to these hits.
 
-## Isolated kernel experiment — not enabled in production
-
-`benchmarks/kernel-workers.exs` runs native work in separate BEAM/OCCT processes
-using standard-I/O `:peer` connections. Each worker owns its native state and
-mutex. The timed path includes BREP serialization, transfer, and restoration in
-the parent, where normal shape validation still runs. No native references cross
-process boundaries. Workers are warmed before measurement and stopped afterward.
-
-Five-sample medians for eight independent builds, milliseconds:
-
-| Work per build | Local serial | One worker | Two workers | Four workers |
-| --- | ---: | ---: | ---: | ---: |
-| Box only | 1.530 | 5.452 | 3.470 | 3.488 |
-| Box with 32 cutters | 261.885 | 312.480 | 169.195 | 99.708 |
-| Box with 128 cutters | 1185.956 | 1759.407 | 804.609 | 505.953 |
-
-Starting all four workers took 400 ms in this run, excluded from warm throughput.
-Every output passed validity and analytical volume checks. Raw data is in
-`results/kernel-workers.csv`. This establishes throughput potential for coarse,
-independent work; it does not make a sequential dependency chain parallel.
-
-A production dispatcher needs measured-cost scheduling, startup amortization,
-bounded worker/process memory, release-compatible launch and shutdown, crash
-recovery, cancellation, deterministic error ordering, and clear serialization
-boundaries for selected subshapes. Tiny jobs regress even with warm workers.
-Consequently this change keeps isolated workers experimental and retains the
-native mutex. A dispatcher can still be internal; no recipe API change is
-required. An explicit document/session lifetime might allow more aggressive
-retention of live native geometry, avoiding snapshot restore costs, but that
-additional API has not been implemented or benchmarked here.
-
-References: [OCCT transform composition](https://dev.opencascade.org/doc/refman/html/classgp___trsf.html)
-and [Erlang peer process lifecycle and standard-I/O connections](https://www.erlang.org/doc/apps/stdlib/peer.html).
+Reference: [OCCT transform composition](https://dev.opencascade.org/doc/refman/html/classgp___trsf.html).
 
 ## Reproduction and verification
 
@@ -107,7 +75,6 @@ OCEX_PATH=../ocex mix run benchmarks/evaluator.exs --samples=11 --output=/tmp/ev
 OCEX_PATH=../ocex mix run benchmarks/evaluator.exs --no-cache --samples=11 --output=/tmp/fusion.csv
 OCEX_PATH=../ocex mix run benchmarks/modeling.exs --cold-cache --variants=baseline --samples=7 --output=/tmp/cold.csv
 OCEX_PATH=../ocex mix run benchmarks/modeling.exs --variants=baseline --samples=7 --output=/tmp/warm.csv
-OCEX_PATH=../ocex mix run benchmarks/kernel-workers.exs --output=/tmp/workers.csv
 ```
 
 Regression tests cover noncommuting transforms and mirrors, input immutability,
