@@ -126,5 +126,5 @@ defmodule Smith.MixProject do
     [ocex, {:kino, "~> 0.19.0", optional: true}, {:ex_doc, "~> 0.40", only: :dev, runtime: false}]
   end
 
-  def application, do: [extra_applications: [:crypto]]
+  def application, do: [extra_applications: [:crypto], mod: {Smith.Application, []}]
 end

@@ -1,5 +1,8 @@
 # Automatic evaluator optimizations — 2026-09-19
 
+Subsequent work is documented in [incremental evaluation and transform fusion](INCREMENTAL_EVALUATION.md).
+The cache-lifetime descriptions and measurements below describe this earlier checkpoint.
+
 The validated automatic-batching checkpoint was committed as Smith `e872321`
 and OCEx `7a6aacf` on `perf/cad-modeling`. Production model recipes contained
 no explicit batching calls and remain unchanged. The following work builds on

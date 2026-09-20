@@ -1178,8 +1178,11 @@ defmodule Smith do
   Evaluation is synchronous. Compatible Boolean runs are grouped automatically;
   repeated self-contained geometry is reused within the call, including copies
   with different placements. Callback-containing recipes are not memoized.
-  Reuse ends with the evaluation; `from_result/1` retains an evaluated stage
-  across calls without rebuilding its source operations. User callback exceptions are not caught. See the
+  Native shape reuse ends with the evaluation. A bounded, expiring cache of
+  serialized pure prefixes can also avoid rebuilding unchanged work across edits.
+  Adjacent rigid transforms are composed before transforming the geometry.
+  `from_result/1` explicitly retains an evaluated stage across calls.
+  User callback exceptions are not caught. See the
   [error guide](errors-and-limits.html) for details.
 
       iex> Smith.box(0, 10, 4) |> Smith.evaluate()
@@ -1220,8 +1223,9 @@ defmodule Smith do
         placements
         |> Enum.reverse()
         |> Enum.with_index(length(base.operations) + 1)
-        |> Enum.reduce_while({:ok, shape, nil}, fn node, context ->
-          case evaluate_node(node, context) do
+        |> Smith.EvaluationPlan.group()
+        |> Enum.reduce_while({:ok, shape, nil}, fn group, context ->
+          case evaluate_group(group, context) do
             {:ok, _, _} = next -> {:cont, next}
             error -> {:halt, error}
           end
@@ -1241,12 +1245,31 @@ defmodule Smith do
   end
 
   defp evaluate_operations(operations) do
-    operations
-    |> Smith.EvaluationPlan.compile()
-    |> Enum.reduce_while({:ok, nil, nil}, fn group, context ->
+    groups = Smith.EvaluationPlan.compile(operations)
+
+    checkpoints =
+      if Process.whereis(Smith.IncrementalCache),
+        do: Smith.EvaluationPlan.checkpoints(groups),
+        else: Enum.map(groups, &{&1, nil})
+
+    {remaining, context} = resume_checkpoint(checkpoints)
+
+    remaining
+    |> Enum.reduce_while(context, fn {group, key}, context ->
+      started = System.monotonic_time(:microsecond)
+
       case evaluate_group(group, context) do
-        {:ok, _, _} = next -> {:cont, next}
-        error -> {:halt, error}
+        {:ok, shape, _} = next ->
+          # Avoid serializing cheap primitives merely to memoize them. Cache
+          # only successful, pure checkpoints with material kernel work.
+          if key && System.monotonic_time(:microsecond) - started >= 2_000 do
+            with {:ok, brep} <- OCEx.to_brep(shape), do: Smith.IncrementalCache.put(key, brep)
+          end
+
+          {:cont, next}
+
+        error ->
+          {:halt, error}
       end
     end)
     |> case do
@@ -1255,7 +1278,44 @@ defmodule Smith do
     end
   end
 
+  defp resume_checkpoint(checkpoints) do
+    keys =
+      checkpoints
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reverse()
+      |> Enum.take(32)
+
+    with true <- keys != [],
+         {key, brep} <- Smith.IncrementalCache.fetch(keys),
+         {:ok, shape} <- OCEx.from_brep(brep) do
+      remaining =
+        checkpoints |> Enum.drop_while(fn {_, candidate} -> candidate != key end) |> tl()
+
+      {remaining, {:ok, shape, nil}}
+    else
+      _ -> {checkpoints, {:ok, nil, nil}}
+    end
+  end
+
   defp evaluate_group([node], context), do: evaluate_node(node, context)
+
+  defp evaluate_group([{{op, _}, _} | _] = nodes, {:ok, body, _} = context)
+       when op in [:translate, :rotate, :mirror] do
+    result =
+      speculative(fn ->
+        if Code.ensure_loaded?(OCEx.Internal) and
+             function_exported?(OCEx.Internal, :transform_chain, 2) do
+          with {:ok, steps} <- transform_steps(nodes),
+               {:ok, shape} <- apply(OCEx.Internal, :transform_chain, [body, steps]),
+               do: {:ok, shape, nil}
+        else
+          :sequential
+        end
+      end)
+
+    recover_group(result, nodes, context)
+  end
 
   defp evaluate_group([{{op, _}, _} | _] = nodes, {:ok, body, envelope} = context)
        when op in [:hole, :counterbore, :countersink] do
@@ -1281,6 +1341,23 @@ defmodule Smith do
       end)
 
     recover_group(result, nodes, context)
+  end
+
+  defp transform_steps(nodes) do
+    Enum.reduce_while(nodes, {:ok, []}, fn
+      {{:mirror, [plane]}, _}, {:ok, steps} ->
+        case modeling_frame(plane) do
+          {:ok, frame} -> {:cont, {:ok, [{:mirror, [frame.origin, frame.n]} | steps]}}
+          error -> {:halt, error}
+        end
+
+      {{op, args}, _}, {:ok, steps} ->
+        {:cont, {:ok, [{op, args} | steps]}}
+    end)
+    |> case do
+      {:ok, steps} -> {:ok, Enum.reverse(steps)}
+      error -> error
+    end
   end
 
   defp speculative(fun) do

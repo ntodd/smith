@@ -1,5 +1,8 @@
 # Performance review
 
+For the next evaluator pass, see [incremental evaluation and transform fusion](INCREMENTAL_EVALUATION.md),
+including cold-cache costs and the isolated-kernel experiment.
+
 For the latest modeling results, see [automatic compiler optimizations](COMPILER_OPTIMIZATIONS.md),
 including the build123d comparison. The measurements below describe the earlier
 mesh-processing work.

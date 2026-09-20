@@ -92,10 +92,19 @@ failure steps. Ordinary recipes do not need them for automatic optimization.
 
 Repeated, self-contained subrecipes are automatically evaluated once within an
 evaluation, including parts that differ only by translation, rotation or mirror.
-Reuse is bounded and ends when evaluation returns or raises. Recipes containing
+Native reuse is bounded and ends when evaluation returns or raises. Recipes containing
 callbacks or retained snapshots are not memoized; nested evaluations have their
 own scope. `Smith.from_result/1` remains useful for explicitly retaining geometry
 across separate evaluations, with revision checks intact.
+
+The evaluator also remembers expensive pure prefixes across edits in a bounded
+snapshot cache: at most 128 entries, 32 MiB of serialized keys and geometry,
+4 MiB per geometry snapshot, expiring after two minutes without use. Hits restore
+independent, validated shapes; the cache holds no native resources. Changed
+operations invalidate their suffix, and callbacks, external assets, retained
+results and unknown operations stop prefix caching. Cache misses, expiry or
+unavailability simply evaluate the ordinary recipe. Consecutive translations,
+rotations and mirrors are automatically composed into one native transform.
 
 A Boolean combines the material occupied by shapes. A boss is a raised pad, often
 used around a fastener; a bore is a cylindrical opening.

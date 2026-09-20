@@ -44,9 +44,14 @@ defmodule Smith.ModelingBenchmark do
           reference_smith: :string,
           variants: :string,
           samples: :integer,
+          cache: :boolean,
+          cold_cache: :boolean,
           models: :string
         ]
       )
+
+    if opts[:cache] == false,
+      do: Supervisor.terminate_child(Smith.Supervisor, Smith.IncrementalCache)
 
     if source = opts[:reference_smith] do
       previous = Code.compiler_options(ignore_module_conflict: true)
@@ -114,6 +119,7 @@ defmodule Smith.ModelingBenchmark do
             IO.inspect(checks, label: "Functional checks: #{name}/#{variant}")
 
             for sample <- 1..samples do
+              if opts[:cold_cache], do: Smith.IncrementalCache.clear()
               :erlang.garbage_collect()
               {us, {:ok, measured}} = :timer.tc(fn -> Smith.evaluate(model) end)
               {:ok, true} = OCEx.valid?(measured.shape)
