@@ -51,12 +51,22 @@ Changing the primitive invalidates the whole prefix; the cache cannot save that
 work and snapshot population has a cost. These measurements deliberately include
 misses as well as hits. Timing thresholds are not regression tests.
 
-Full-model medians, seven samples each:
+Full-model medians across the optimization stages:
 
-| Model | Previous evaluator | New cold cache | New warm cache |
-| --- | ---: | ---: | ---: |
-| Tray | 1.836 s | 1.930 s | 1.464 s |
-| Clip | 206 ms | 225 ms | 22.5 ms |
+| Model | Original, before modeling optimizations | Optimized checkpoint, before incremental caching | Final cold cache | Final warm cache |
+| --- | ---: | ---: | ---: | ---: |
+| Tray | 4.121 s | 1.836 s | 1.930 s | 1.464 s |
+| Clip | 2.011 s | 206 ms | 225 ms | 22.5 ms |
+
+The original baseline uses five samples with the original Smith source and OCEx
+binary (`results/modeling-original-isolated.csv`). The intermediate checkpoint
+uses ten samples (`results/compiler-final-verified.csv`); the final cold/warm
+runs use seven each. The 1.836 s tray figure is an already-optimized checkpoint,
+not the starting baseline. A separate later pre-automatic-batching run measured
+4.294 s; it is recorded in `results/modeling-before-automatic.csv`.
+
+Relative to the original baseline, final cold-cache rebuilds are about 2.1×
+faster for the tray and 8.9× faster for the clip. Warm reuse is a separate workload.
 
 Cold-cache runs clear snapshots before each timed evaluation and include snapshot
 population. Warm runs reuse the unchanged recipe. The tray contains ineligible
