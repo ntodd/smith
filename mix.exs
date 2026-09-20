@@ -4,7 +4,7 @@ defmodule Smith.MixProject do
   def project do
     [
       app: :smith,
-      version: "0.3.0",
+      version: "0.4.0",
       elixir: "~> 1.18",
       name: "Smith",
       description:
@@ -34,8 +34,8 @@ defmodule Smith.MixProject do
         before_closing_body_tag: %{
           html: ~s(<script type="module" src="preview/docs.js"></script>)
         },
-        source_ref: "v0.3.0",
-        source_url_pattern: "https://github.com/ntodd/smith/blob/v0.3.0/%{path}#L%{line}",
+        source_ref: "v0.4.0",
+        source_url_pattern: "https://github.com/ntodd/smith/blob/v0.4.0/%{path}#L%{line}",
         extras: [
           "README.md",
           "guides/getting-started.md",
@@ -119,7 +119,7 @@ defmodule Smith.MixProject do
     # An explicit opt-in for repository development; published consumers use Hex.
     ocex =
       case System.get_env("OCEX_PATH") do
-        nil -> {:ocex, "~> 0.3.0"}
+        nil -> {:ocex, "~> 0.4.0"}
         path -> {:ocex, path: path}
       end
 
