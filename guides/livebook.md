@@ -12,7 +12,7 @@ The runtime executing the notebook needs the toolkit, compiler, and OTP headers.
 For a remote runtime, install them on that machine.
 
 ```elixir
-Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.4.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 Run this in the setup cell. Smith brings OCEx in as a dependency. Kino provides

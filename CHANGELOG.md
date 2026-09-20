@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Add immutable SVG assets and deferred artwork recipes, with fills, strokes,
   holes, group selection, units/transforms, physical fitting, and plane placement.
@@ -10,8 +10,13 @@
   file-upload/keychain notebook with raised and engraved variants.
 - Accept SVG compact decimals and retain six licensed upstream icon fixtures
   with physical sizing, extrusion and engraving regression checks.
-- Requires the accompanying unreleased OCEx planar artwork operations. Use
-  `OCEX_PATH` to test both checkouts until the next coordinated package release.
+- Automatically batch compatible Boolean operations and independent holes,
+  reuse repeated pure geometry, and compose consecutive rigid transforms.
+- Reuse expensive pure prefixes across edits with a bounded, expiring snapshot
+  cache. Preserve callbacks, input geometry, validation, and original errors.
+- Improve mesh connectivity traversal and STL serialization performance.
+- Require OCEx 0.4 from Hex. The evaluation-cache supervisor starts automatically;
+  existing recipes need no new options or application configuration.
 
 ## 0.3.0
 

@@ -15,7 +15,7 @@ each stage.
 Install the native toolkit using the [installation guide](https://hexdocs.pm/ocex/installation.html), then save this as `mount.exs`:
 
 ```elixir
-Mix.install([{:smith, "~> 0.3.0"}])
+Mix.install([{:smith, "~> 0.4.0"}])
 alias Smith.Sketch
 
 model =
@@ -37,13 +37,13 @@ IO.puts(files.three_mf)
 
 Run `elixir mount.exs`. The output bundle includes STEP, BREP, binary STL, and 3MF files, plus a report of the mesh and STEP checks. Every export gets a new directory; earlier exports remain available. 3MF contains printable geometry, without printer or slicer settings.
 
-In an existing Mix project, add `{:smith, "~> 0.3.0"}` to `deps/0`. Smith requires Elixir 1.18+ and a supported native installation; see the installation guide for the tested OS/OTP combinations. No display server is required to model, mesh, or export.
+In an existing Mix project, add `{:smith, "~> 0.4.0"}` to `deps/0`. Smith requires Elixir 1.18+ and a supported native installation; see the installation guide for the tested OS/OTP combinations. No display server is required to model, mesh, or export.
 
 The [HexDocs version of this README](https://hexdocs.pm/smith/readme.html) includes interactive previews below the examples. Drag to rotate, scroll to zoom, or open a preview fullscreen. GitHub shows still images.
 
 ## Font-backed lettering
 
-Smith 0.3 adds explicit TTF/OTF font snapshots, shaped text outlines, raised or
+Smith supports explicit TTF/OTF font snapshots, shaped text outlines, raised or
 engraved lettering, and proportional name fitting. Text reports measure actual
 ink bounds and glyph placement, record the font hash, and produce matching PNG
 and outline SVG previews. Follow [Text and fonts](guides/text.md)

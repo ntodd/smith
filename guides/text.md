@@ -1,6 +1,6 @@
 # Text and fonts
 
-Smith 0.3 can turn a name and an explicit TTF/OTF font into filled outlines,
+Smith can turn a name and an explicit TTF/OTF font into filled outlines,
 measure the layout, and extrude it for raised or engraved lettering. Native
 installation also needs FreeType, HarfBuzz and pkg-config; see the
 [OCEx installation guide](https://hexdocs.pm/ocex/installation.html).
@@ -101,4 +101,4 @@ between shaped clusters; nonzero tracking disables optional ligatures. Use
 run, with no automatic mixed-direction paragraphs or wrapping. Unsupported
 characters fail as `:missing_glyph`; fonts are never silently replaced. Empty or
 whitespace-only labels fail. Variable-font axes, bitmap/color glyphs, and text
-wrapped around curved surfaces are not exposed in 0.3.
+wrapped around curved surfaces are not exposed.

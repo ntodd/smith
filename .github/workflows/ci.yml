@@ -4,11 +4,6 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
-    inputs:
-      published_ocex:
-        description: Test against OCEx from public Hex instead of the staged release
-        type: boolean
-        default: false
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -29,19 +24,6 @@ jobs:
       OpenCASCADE_DIR: ${{ github.workspace }}/.occt/lib/cmake/opencascade
     steps:
       - uses: actions/checkout@v4
-      - name: Staged OCEx release
-        if: ${{ !inputs.published_ocex }}
-        uses: actions/checkout@v4
-        with:
-          repository: ntodd/ocex
-          # Companion OCEx performance implementation; pin until its release.
-          ref: f6d51a9a592635043e68ccedc7f5792b71615c17
-          path: .ci/ocex
-      - name: Use staged OCEx
-        if: ${{ !inputs.published_ocex }}
-        run: |
-          echo "OCEX_PATH=$GITHUB_WORKSPACE/.ci/ocex" >> "$GITHUB_ENV"
-          echo "OCEX_ARCHIVE=$GITHUB_WORKSPACE/.ci/ocex/ocex-0.3.0.tar" >> "$GITHUB_ENV"
       - uses: erlef/setup-beam@v1
         with:
           elixir-version: ${{ matrix.beam.elixir }}
@@ -59,10 +41,10 @@ jobs:
         id: occt
         with:
           path: .occt
-          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.ci/ocex/scripts/install-occt.sh', '.ci/ocex/scripts/check-allocator.cpp', '.ci/ocex/scripts/patches/**', 'deps/ocex/scripts/install-occt.sh', 'deps/ocex/scripts/check-allocator.cpp', 'deps/ocex/scripts/patches/**') }}
+          key: occt-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('deps/ocex/scripts/install-occt.sh', 'deps/ocex/scripts/check-allocator.cpp', 'deps/ocex/scripts/patches/**') }}
       - name: Build pinned OCCT
         if: steps.occt.outputs.cache-hit != 'true'
-        run: sh "${OCEX_PATH:-deps/ocex}/scripts/install-occt.sh" "$GITHUB_WORKSPACE/.occt"
+        run: sh deps/ocex/scripts/install-occt.sh "$GITHUB_WORKSPACE/.occt"
       - name: Cache verified OCCT installation
         if: steps.occt.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
@@ -72,9 +54,7 @@ jobs:
       - name: Tests and documentation
         run: make check docs notebooks
       - name: Package and isolated consumer
-        run: |
-          if [ -n "${OCEX_PATH:-}" ]; then (cd "$OCEX_PATH" && mix hex.build); fi
-          make package package-smoke
+        run: make package package-smoke
       - uses: actions/upload-artifact@v4
         with:
           name: smith-${{ matrix.os }}-${{ matrix.beam.elixir }}

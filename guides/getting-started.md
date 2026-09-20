@@ -15,10 +15,10 @@ The OCCT libraries must remain installed after compilation. A successful Mix dep
 For a standalone file:
 
 ```elixir
-Mix.install([{:smith, "~> 0.3.0"}])
+Mix.install([{:smith, "~> 0.4.0"}])
 ```
 
-For an existing Mix application, add `{:smith, "~> 0.3.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. There is no Smith application process or supervision tree to configure.
+For an existing Mix application, add `{:smith, "~> 0.4.0"}` to its dependencies and run `mix deps.get`. Use `Mix.install` only in standalone scripts or notebook setup, not inside an existing Mix project. Smith starts its bounded evaluation-cache supervisor automatically; no application configuration is required.
 
 ## Define a reusable part
 

@@ -2,7 +2,7 @@
 
 An assembly names parts and places them relative to one another without fusing
 them. A reference is hardware or another object you need to fit around but will
-not print. Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.3.0"}])`, or in a Livebook.
+not print. Assemblies are ordinary immutable values. Parts contain deferred Smith recipes; evaluation constructs native geometry. A design can stay in a standalone `.exs` file with `Mix.install([{:smith, "~> 0.4.0"}])`, or in a Livebook.
 
 ```elixir
 alias Smith.Assembly

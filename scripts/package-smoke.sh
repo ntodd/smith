@@ -2,15 +2,26 @@
 # A private, signed local registry tests the actual Hex dependency graph without publishing.
 set -eu
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+smith_version=$(elixir -e 'Mix.start(); Code.require_file("mix.exs"); IO.write(Mix.Project.config()[:version])')
+export SMITH_VERSION="$smith_version"
+if [ -n "${OCEX_ARCHIVE:-}" ]; then
+  archive_name=$(basename "$OCEX_ARCHIVE")
+  case "$archive_name" in ocex-*.tar) ;; *) echo "Expected an ocex-VERSION.tar archive" >&2; exit 1 ;; esac
+  ocex_version=${archive_name#ocex-}
+  ocex_version=${ocex_version%.tar}
+else
+  ocex_version=$(elixir -e '{lock, _} = Code.eval_file("mix.lock"); IO.write(elem(Map.fetch!(lock, "ocex"), 2))')
+fi
 work=$(mktemp -d)
 server_pid=
 trap '[ -z "$server_pid" ] || kill "$server_pid" 2>/dev/null || true; rm -rf "$work"' EXIT HUP INT TERM
 mkdir -p "$work/registry/tarballs" "$work/consumer"
-cp "$root/smith-0.3.0.tar" "$work/registry/tarballs/"
+cp "$root/smith-$smith_version.tar" "$work/registry/tarballs/"
 if [ -n "${OCEX_ARCHIVE:-}" ]; then
-  cp "$OCEX_ARCHIVE" "$work/registry/tarballs/ocex-0.3.0.tar"
+  cp "$OCEX_ARCHIVE" "$work/registry/tarballs/ocex-$ocex_version.tar"
 else
-  (cd "$work/registry/tarballs" && mix hex.package fetch ocex 0.3.0)
+  (cd "$work/registry/tarballs" && mix hex.package fetch ocex "$ocex_version")
 fi
 cp "$root/scripts/package-smoke.exs" "$work/consumer/model.exs"
 openssl genrsa -out "$work/private.pem" 2048 2>/dev/null
@@ -34,7 +45,7 @@ export HEX_HOME="$work/hex"
 export MIX_INSTALL_DIR="$work/install"
 unset OCEX_PATH
 mix hex.repo add hexpm "http://127.0.0.1:$(cat "$work/port")" --public-key="$work/registry/public_key"
-mix hex.package fetch ocex 0.3.0 --unpack --output "$work/toolkit"
+mix hex.package fetch ocex "$ocex_version" --unpack --output "$work/toolkit"
 test -f "$work/toolkit/scripts/check-allocator.cpp"
 cd "$work/consumer"
 elixir model.exs

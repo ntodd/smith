@@ -1,5 +1,15 @@
 # This file is copied out of the repository and run against archive-installed deps.
-Mix.install([{:smith, "~> 0.3.0"}])
+smith_version = System.fetch_env!("SMITH_VERSION")
+Mix.install([{:smith, smith_version}])
+^smith_version = Application.spec(:smith, :vsn) |> to_string()
+
+{:ok, artwork} = Smith.SVG.from_binary(~s(<svg xmlns="http://www.w3.org/2000/svg" width="20mm" height="10mm" viewBox="0 0 20 10"><path fill-rule="evenodd" d="M0 0H20V10H0Z M5 2H15V8H5Z"/></svg>))
+{:ok, svg_part} = artwork |> Smith.svg() |> Smith.extrude(2) |> Smith.evaluate()
+{:ok, true} = OCEx.valid?(svg_part.shape)
+{:ok, svg_volume} = OCEx.volume(svg_part.shape)
+true = abs(svg_volume - 280) < 1.0e-6
+{:ok, _} = Smith.export(svg_part, "output", name: "archive-svg", on_bed: true)
+IO.puts("Verified archive-installed Smith #{smith_version}: SVG holes, extrusion and printable export")
 
 {:ok, font} = Smith.Font.load(Path.join(:code.priv_dir(:smith), "fonts/Graduate-Regular.ttf"))
 text = Smith.text("TEAM", font: font, size: 8, align: {:center, :center}, on: Smith.Plane.xy(z: 1.8))

@@ -1,7 +1,7 @@
 # A plate, step by step
 
 ```elixir
-Mix.install([{:smith, "~> 0.3.0"}, {:kino, "~> 0.19.0"}])
+Mix.install([{:smith, "~> 0.4.0"}, {:kino, "~> 0.19.0"}])
 ```
 
 ## First lesson
