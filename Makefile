@@ -1,4 +1,4 @@
-.PHONY: check test docs notebooks package package-smoke models view
+.PHONY: check test docs notebooks package package-smoke models view bench
 
 check:
 	mix format --check-formatted
@@ -9,6 +9,9 @@ check:
 
 test:
 	mix test
+
+bench:
+	mix run benchmarks/performance.exs
 
 docs:
 	mix run scripts/check-api.exs

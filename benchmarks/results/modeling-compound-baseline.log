@@ -1,0 +1,22 @@
+plant-stand/baseline: 4068.3 ms
+plant-stand/baseline: 4066.95 ms
+plant-stand/baseline: 4063.1 ms
+plant-stand/baseline: 4067.36 ms
+plant-stand/baseline: 4070.74 ms
+plant-stand/batch-cut: 4144.61 ms
+plant-stand/batch-cut: 4115.96 ms
+plant-stand/batch-cut: 4051.4 ms
+plant-stand/batch-cut: 4073.26 ms
+plant-stand/batch-cut: 4134.05 ms
+REJECTED plant-stand/batch-cut-fuse: %Smith.Error{part: nil, step: 3, operation: :fuse, reason: :invalid_shape}
+deck-clip/baseline: 1922.04 ms
+deck-clip/baseline: 1920.03 ms
+deck-clip/baseline: 1925.97 ms
+deck-clip/baseline: 1918.46 ms
+deck-clip/baseline: 1921.38 ms
+deck-clip/batch-cut: 1951.71 ms
+deck-clip/batch-cut: 1963.05 ms
+deck-clip/batch-cut: 1943.61 ms
+deck-clip/batch-cut: 1935.13 ms
+deck-clip/batch-cut: 1962.23 ms
+REJECTED deck-clip/batch-cut-fuse: %Smith.Error{part: nil, step: 7, operation: :counterbore, reason: :hole_misses_body}

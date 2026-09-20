@@ -2,6 +2,85 @@ defmodule Smith.HoleFeaturesTest do
   use ExUnit.Case, async: true
   alias Smith.Plane
 
+  test "speculative preparation cannot replace an earlier feature error with a later exception" do
+    assert {:error, %Smith.Error{step: 2, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(60, 16, 10)
+             |> Smith.hole(on: Plane.xy(), at: {100, 8}, diameter: 4, through: :all)
+             |> Smith.hole(on: Plane.xy(), at: {30, 8}, diameter: 4, through: :all)
+             |> Smith.countersink(
+               on: Plane.xy(),
+               at: {50, 8},
+               diameter: 4,
+               sink_diameter: Integer.pow(10, 400),
+               through: :all
+             )
+             |> Smith.evaluate()
+  end
+
+  test "independent explicit-plane hole features match sequential snapshots" do
+    source = Smith.box(60, 16, 10)
+
+    features = [
+      {:hole, [on: Plane.xy(z: 10), at: {10, 8}, diameter: 4, through: :all]},
+      {:counterbore,
+       [
+         on: Plane.xy(z: 10),
+         at: {30, 8},
+         diameter: 4,
+         bore_diameter: 8,
+         bore_depth: 3,
+         through: :all
+       ]},
+      {:countersink,
+       [on: Plane.xy(z: 10), at: {50, 8}, diameter: 4, sink_diameter: 8, through: :all]}
+    ]
+
+    together =
+      Enum.reduce(features, source, fn {op, opts}, model -> apply(Smith, op, [model, opts]) end)
+
+    separate =
+      Enum.reduce(features, source, fn {op, opts}, model ->
+        {:ok, result} = apply(Smith, op, [model, opts]) |> Smith.evaluate()
+        Smith.from_result(result)
+      end)
+
+    {:ok, a} = Smith.evaluate(together)
+    {:ok, b} = Smith.evaluate(separate)
+
+    for {left, right} <- [{a.shape, b.shape}, {b.shape, a.shape}] do
+      assert {:ok, delta} = OCEx.cut(left, right)
+      assert {:ok, amount} = OCEx.volume(delta)
+      assert_in_delta amount, 0, 1.0e-7
+    end
+  end
+
+  test "overlapping hole runs retain per-feature misses and original indices" do
+    opts = [on: Plane.xy(), at: {5, 5}, diameter: 2, through: :all]
+
+    assert {:error, %Smith.Error{step: 4, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(20, 10, 3)
+             |> Smith.hole(opts)
+             |> Smith.hole(Keyword.put(opts, :at, {15, 5}))
+             |> Smith.hole(opts)
+             |> Smith.evaluate()
+  end
+
+  test "independent batch validation recovers a later recess miss at its original step" do
+    assert {:error, %Smith.Error{step: 4, operation: :counterbore, reason: :recess_misses_body}} =
+             Smith.box(60, 16, 10)
+             |> Smith.hole(on: Plane.xy(), at: {10, 8}, diameter: 4, through: :all)
+             |> Smith.hole(on: Plane.xy(), at: {30, 8}, diameter: 4, through: :all)
+             |> Smith.counterbore(
+               on: Plane.xy(z: 20),
+               at: {50, 8},
+               diameter: 4,
+               bore_diameter: 8,
+               bore_depth: 2,
+               through: :all
+             )
+             |> Smith.evaluate()
+  end
+
   defp volume(recipe, expected) do
     assert {:ok, result} = Smith.evaluate(recipe)
     assert {:ok, true} = OCEx.valid?(result.shape)
@@ -111,5 +190,91 @@ defmodule Smith.HoleFeaturesTest do
              |> Smith.evaluate()
 
     volume(source, 3200)
+  end
+
+  test "successive holes reject repeated and tangent cutters at their original step" do
+    hole = [on: Plane.xy(), at: {5, 5}, diameter: 2, through: :all]
+
+    assert {:error, %Smith.Error{step: 3, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(10, 10, 3)
+             |> Smith.hole(hole)
+             |> Smith.hole(hole)
+             |> Smith.evaluate()
+
+    assert {:error, %Smith.Error{step: 3, operation: :hole, reason: :hole_misses_body}} =
+             Smith.box(10, 10, 3)
+             |> Smith.hole(hole)
+             |> Smith.hole(on: Plane.xy(), at: {11, 5}, diameter: 2, through: :all)
+             |> Smith.evaluate()
+  end
+
+  test "a recess must remove additional material beyond an existing wider bore" do
+    assert {:error, %Smith.Error{step: 3, operation: :counterbore, reason: :recess_misses_body}} =
+             Smith.box(10, 10, 10)
+             |> Smith.hole(on: Plane.xy(z: 10), at: {5, 5}, diameter: 6, depth: 3)
+             |> Smith.counterbore(
+               on: Plane.xy(z: 10),
+               at: {5, 5},
+               diameter: 2,
+               through: :all,
+               bore_diameter: 4,
+               bore_depth: 2
+             )
+             |> Smith.evaluate()
+  end
+
+  test "top placement is resolved again after each hole changes the face centroid" do
+    first = Smith.box(20, 16, 10) |> Smith.hole(on: :top, at: {-4, 0}, diameter: 2, depth: 3)
+    assert {:ok, intermediate} = Smith.evaluate(first)
+    selector = Smith.Selector.facing(:z) |> Smith.Selector.at_max(:z)
+    assert {:ok, [face]} = Smith.Selector.select(intermediate.shape, :faces, selector)
+    assert {:ok, %{center: {x, y, z}}} = OCEx.face_info(face)
+    assert x > 10
+
+    expected = first |> Smith.hole(on: Plane.xy(z: z), at: {x, y}, diameter: 2, through: :all)
+    actual = first |> Smith.hole(on: :top, diameter: 2, through: :all)
+    assert {:ok, a} = Smith.evaluate(actual)
+    assert {:ok, b} = Smith.evaluate(expected)
+
+    for {left, right} <- [{a.shape, b.shape}, {b.shape, a.shape}] do
+      assert {:ok, delta} = OCEx.cut(left, right)
+      assert {:ok, amount} = OCEx.volume(delta)
+      assert_in_delta amount, 0, 1.0e-7
+    end
+  end
+
+  test "through-hole bounds follow intervening transformations" do
+    Smith.box(20, 16, 10)
+    |> Smith.hole(on: Plane.xy(), at: {5, 5}, diameter: 2, through: :all)
+    |> Smith.translate({0, 0, 100})
+    |> Smith.hole(on: Plane.xy(), at: {15, 5}, diameter: 2, through: :all)
+    |> volume(3200 - 20 * :math.pi())
+  end
+
+  test "successive intersecting holes match separate evaluations as the envelope shrinks" do
+    first =
+      Smith.box(20, 10, 10)
+      |> Smith.hole(on: Plane.xy(), at: {0, 5}, diameter: 20, through: :all)
+
+    assert {:ok, snapshot} = Smith.evaluate(first)
+    opts = [on: Plane.xz(y: 100), at: {12, 5}, diameter: 8, through: :all]
+    assert {:ok, together} = first |> Smith.hole(opts) |> Smith.evaluate()
+
+    assert {:ok, separate} =
+             snapshot |> Smith.from_result() |> Smith.hole(opts) |> Smith.evaluate()
+
+    for {a, b} <- [{together.shape, separate.shape}, {separate.shape, together.shape}] do
+      assert {:ok, delta} = OCEx.cut(a, b)
+      assert {:ok, volume} = OCEx.volume(delta)
+      assert_in_delta volume, 0, 1.0e-7
+    end
+  end
+
+  test "a through-hole following complete removal retains the empty-body error" do
+    assert {:error, %Smith.Error{step: 3, operation: :hole, reason: :empty_shape}} =
+             Smith.box(2, 2, 2)
+             |> Smith.hole(on: Plane.xy(), at: {1, 1}, diameter: 10, through: :all)
+             |> Smith.hole(on: Plane.xy(), at: {1, 1}, diameter: 2, through: :all)
+             |> Smith.evaluate()
   end
 end

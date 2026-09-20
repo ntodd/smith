@@ -69,10 +69,47 @@ ball = Smith.sphere(3, at: {0, 0, 3})
 
 ## Boolean composition
 
+Write ordinary `Smith.cut/2` and `Smith.fuse/2` recipes, including lists of tools.
+The evaluator automatically groups compatible consecutive operations to reduce
+repeated intersection and cleanup work. Tools containing selectors or callbacks,
+retained results, and operations that inspect or transform the current body
+remain evaluation boundaries. Failed groups are retried in recipe order so
+errors identify the original failing step. Older OCEx versions use sequential
+operations automatically.
+
+Hole features also avoid repeatedly measuring the whole part. Through-holes
+reuse an enclosing box within a consecutive run, while `on: :top` placement
+still follows the current face centroid after each cut. Runs of explicit-plane
+holes are batched when their complete cutter envelopes are disjoint. Overlapping
+cutters and body-dependent placement keep sequential behavior, including the
+checks that pilots and recesses remove material. No optimization options or
+recipe rewrites are needed.
+
+`Smith.cut_many/2` and `Smith.fuse_many/2` explicitly request a single native
+batch, including tools that automatic planning treats as boundaries. These
+advanced operations require OCEx batch support and can report different
+failure steps. Ordinary recipes do not need them for automatic optimization.
+
+Repeated, self-contained subrecipes are automatically evaluated once within an
+evaluation, including parts that differ only by translation, rotation or mirror.
+Native reuse is bounded and ends when evaluation returns or raises. Recipes containing
+callbacks or retained snapshots are not memoized; nested evaluations have their
+own scope. `Smith.from_result/1` remains useful for explicitly retaining geometry
+across separate evaluations, with revision checks intact.
+
+The evaluator also remembers expensive pure prefixes across edits in a bounded
+snapshot cache: at most 128 entries, 32 MiB of serialized keys and geometry,
+4 MiB per geometry snapshot, expiring after two minutes without use. Hits restore
+independent, validated shapes; the cache holds no native resources. Changed
+operations invalidate their suffix, and callbacks, external assets, retained
+results and unknown operations stop prefix caching. Cache misses, expiry or
+unavailability simply evaluate the ordinary recipe. Consecutive translations,
+rotations and mirrors are automatically composed into one native transform.
+
 A Boolean combines the material occupied by shapes. A boss is a raised pad, often
 used around a fastener; a bore is a cylindrical opening.
 
-`fuse/2` adds material, `cut/2` subtracts a tool, and `common/2` retains the intersection. Fuse and cut also accept ordered lists. An empty list leaves the recipe alone. Each operation resolves its tool recipe and cleans same-domain topology afterward.
+`fuse/2` adds material, `cut/2` subtracts a tool, and `common/2` retains the intersection. Fuse and cut also accept ordered lists. An empty list leaves the recipe alone. The evaluator resolves tool recipes and cleans same-domain topology at evaluation boundaries.
 
 ```elixir
 bores = for x <- [-12, 12], do: Smith.cylinder(2, 6, at: {x, 0, -1})

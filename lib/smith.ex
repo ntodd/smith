@@ -894,8 +894,9 @@ defmodule Smith do
   @doc """
   Unites a model with one tool recipe or an ordered list of recipes.
 
-  Each tool is evaluated, united with the current body, and followed by
-  same-domain cleanup. An empty list returns the original recipe. Disjoint
+  Tools are evaluated in order and united with the body with same-domain
+  cleanup. Compatible consecutive operations are automatically grouped.
+  An empty list returns the original recipe. Disjoint
   inputs can leave multiple solids; this does not fail evaluation.
 
       iex> base = Smith.box(10, 10, 2)
@@ -919,7 +920,8 @@ defmodule Smith do
   @doc """
   Subtracts one tool recipe or an ordered list from the current body.
 
-  Each subtraction is followed by same-domain cleanup. An empty list returns
+  Subtractions include same-domain cleanup; compatible consecutive operations
+  are automatically grouped. An empty list returns
   the original recipe. A missed tool can leave the geometry unchanged, and
   removing all material can produce an empty compound. Use `hole/2` when
   a missed circular through-cut should fail explicitly.
@@ -933,6 +935,34 @@ defmodule Smith do
     do: Enum.reduce(tools, model, &cut(&2, &1))
 
   def cut(model, tool), do: append(model, :cut, [tool])
+
+  @doc """
+  Subtracts a list of tool recipes in one native Boolean operation.
+
+  This explicitly requests a single batch; ordinary `cut/2` recipes are
+  already optimized automatically when compatible. Tools
+  are evaluated in list order; overlapping tools are subtracted once. Cleanup
+  runs once on the final result. Empty lists leave the recipe unchanged.
+  Intermediate topology and failure step numbers can differ from sequential
+  operations. Requires an OCEx version providing `OCEx.cut_many/2`; otherwise
+  evaluation returns an error with reason `:unsupported_operation`.
+  """
+  @spec cut_many(Model.t(), [Model.t()]) :: Model.t()
+  def cut_many(%Model{} = model, []), do: model
+  def cut_many(model, tools), do: append(model, :cut_many, [tools])
+
+  @doc """
+  Unites a body and tool recipes in one native Boolean operation.
+
+  Tools are evaluated in list order and may overlap each other. Cleanup runs
+  once, and disconnected solids remain separate. Empty lists leave the recipe
+  unchanged. Ordinary `fuse/2` recipes are optimized automatically and retain
+  original recipe-step errors. Requires an OCEx version providing `OCEx.fuse_many/2`;
+  otherwise evaluation returns reason `:unsupported_operation`.
+  """
+  @spec fuse_many(Model.t(), [Model.t()]) :: Model.t()
+  def fuse_many(%Model{} = model, []), do: model
+  def fuse_many(model, tools), do: append(model, :fuse_many, [tools])
 
   @doc """
   Retains the intersection with a tool recipe, then cleans its topology.
@@ -1145,10 +1175,14 @@ defmodule Smith do
   error atom. Empty models return `:empty_model`; unsupported top-level
   terms return `:invalid_recipe`.
 
-  Evaluation is synchronous. It rebuilds a recipe on each call, except that
-  equal member recipes within one assembly evaluation share their base
-  evaluation. Use `from_result/1` to reuse an evaluated stage across branches
-  or calls without rebuilding its source operations. User callback exceptions are not caught. See the
+  Evaluation is synchronous. Compatible Boolean runs are grouped automatically;
+  repeated self-contained geometry is reused within the call, including copies
+  with different placements. Callback-containing recipes are not memoized.
+  Native shape reuse ends with the evaluation. A bounded, expiring cache of
+  serialized pure prefixes can also avoid rebuilding unchanged work across edits.
+  Adjacent rigid transforms are composed before transforming the geometry.
+  `from_result/1` explicitly retains an evaluated stage across calls.
+  User callback exceptions are not caught. See the
   [error guide](errors-and-limits.html) for details.
 
       iex> Smith.box(0, 10, 4) |> Smith.evaluate()
@@ -1169,23 +1203,203 @@ defmodule Smith do
 
   def evaluate(%Model{operations: []}), do: {:error, :empty_model}
 
-  def evaluate(%Model{operations: operations}) do
-    operations
-    |> Enum.reverse()
-    |> Enum.with_index(1)
-    |> Enum.reduce_while({:ok, nil}, fn {{operation, args}, index}, {:ok, body} ->
-      case apply_operation(operation, body, args) do
-        {:ok, next} ->
-          {:cont, {:ok, next}}
-
-        {:error, reason} ->
-          {:halt, {:error, %Error{step: index, operation: operation, reason: reason}}}
-      end
-    end)
-    |> finish()
+  def evaluate(%Model{} = model) do
+    Smith.EvaluationCache.with_scope(model, fn -> model |> evaluate_shape() |> finish() end)
   end
 
   def evaluate(_), do: {:error, :invalid_recipe}
+
+  # Tool results are consumed as shapes, so do not serialize and hash a public
+  # Result that the parent immediately discards. Native operations still
+  # validate their outputs, and the public evaluation boundary calls finish/1.
+  defp evaluate_shape(%Model{operations: []}), do: {:error, :empty_model}
+
+  defp evaluate_shape(%Model{} = model) do
+    {base, placements} = Smith.EvaluationPlan.placement_base(model)
+
+    if Smith.EvaluationCache.candidate?(base) do
+      with {:ok, shape} <-
+             Smith.EvaluationCache.fetch(base, fn -> evaluate_operations(base.operations) end) do
+        placements
+        |> Enum.reverse()
+        |> Enum.with_index(length(base.operations) + 1)
+        |> Smith.EvaluationPlan.group()
+        |> Enum.reduce_while({:ok, shape, nil}, fn group, context ->
+          case evaluate_group(group, context) do
+            {:ok, _, _} = next -> {:cont, next}
+            error -> {:halt, error}
+          end
+        end)
+        |> case do
+          {:ok, placed, _} -> {:ok, placed}
+          error -> error
+        end
+      end
+    else
+      evaluate_operations(model.operations)
+    end
+  end
+
+  defp evaluate_shape(recipe) do
+    with {:ok, result} <- evaluate(recipe), do: {:ok, result.shape}
+  end
+
+  defp evaluate_operations(operations) do
+    groups = Smith.EvaluationPlan.compile(operations)
+
+    checkpoints =
+      if Process.whereis(Smith.IncrementalCache),
+        do: Smith.EvaluationPlan.checkpoints(groups),
+        else: Enum.map(groups, &{&1, nil})
+
+    {remaining, context} = resume_checkpoint(checkpoints)
+
+    remaining
+    |> Enum.reduce_while(context, fn {group, key}, context ->
+      started = System.monotonic_time(:microsecond)
+
+      case evaluate_group(group, context) do
+        {:ok, shape, _} = next ->
+          # Avoid serializing cheap primitives merely to memoize them. Cache
+          # only successful, pure checkpoints with material kernel work.
+          if key && System.monotonic_time(:microsecond) - started >= 2_000 do
+            with {:ok, brep} <- OCEx.to_brep(shape), do: Smith.IncrementalCache.put(key, brep)
+          end
+
+          {:cont, next}
+
+        error ->
+          {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, shape, _envelope} -> {:ok, shape}
+      error -> error
+    end
+  end
+
+  defp resume_checkpoint(checkpoints) do
+    keys =
+      checkpoints
+      |> Enum.map(&elem(&1, 1))
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reverse()
+      |> Enum.take(32)
+
+    with true <- keys != [],
+         {key, brep} <- Smith.IncrementalCache.fetch(keys),
+         {:ok, shape} <- OCEx.from_brep(brep) do
+      remaining =
+        checkpoints |> Enum.drop_while(fn {_, candidate} -> candidate != key end) |> tl()
+
+      {remaining, {:ok, shape, nil}}
+    else
+      _ -> {checkpoints, {:ok, nil, nil}}
+    end
+  end
+
+  defp evaluate_group([node], context), do: evaluate_node(node, context)
+
+  defp evaluate_group([{{op, _}, _} | _] = nodes, {:ok, body, _} = context)
+       when op in [:translate, :rotate, :mirror] do
+    result =
+      speculative(fn ->
+        if Code.ensure_loaded?(OCEx.Internal) and
+             function_exported?(OCEx.Internal, :transform_chain, 2) do
+          with {:ok, steps} <- transform_steps(nodes),
+               {:ok, shape} <- apply(OCEx.Internal, :transform_chain, [body, steps]),
+               do: {:ok, shape, nil}
+        else
+          :sequential
+        end
+      end)
+
+    recover_group(result, nodes, context)
+  end
+
+  defp evaluate_group([{{op, _}, _} | _] = nodes, {:ok, body, envelope} = context)
+       when op in [:hole, :counterbore, :countersink] do
+    features = Enum.map(nodes, fn {feature, _} -> feature end)
+    result = speculative(fn -> Smith.Features.Hole.evaluate_batch(body, features, envelope) end)
+    recover_group(result, nodes, context)
+  end
+
+  defp evaluate_group([{{operation, _}, _} | _] = nodes, {:ok, body, _} = context) do
+    native = if operation == :cut, do: :cut_many, else: :fuse_many
+    tools = Enum.map(nodes, fn {{_, [tool]}, _} -> tool end)
+
+    result =
+      speculative(fn ->
+        if Code.ensure_loaded?(OCEx) and function_exported?(OCEx, native, 2) do
+          with {:ok, shapes} <- evaluate_edges(tools),
+               {:ok, result} <- apply(OCEx, native, [body, shapes]),
+               {:ok, result} <- OCEx.clean(result),
+               do: {:ok, result, nil}
+        else
+          :sequential
+        end
+      end)
+
+    recover_group(result, nodes, context)
+  end
+
+  defp transform_steps(nodes) do
+    Enum.reduce_while(nodes, {:ok, []}, fn
+      {{:mirror, [plane]}, _}, {:ok, steps} ->
+        case modeling_frame(plane) do
+          {:ok, frame} -> {:cont, {:ok, [{:mirror, [frame.origin, frame.n]} | steps]}}
+          error -> {:halt, error}
+        end
+
+      {{op, args}, _}, {:ok, steps} ->
+        {:cont, {:ok, [{op, args} | steps]}}
+    end)
+    |> case do
+      {:ok, steps} -> {:ok, Enum.reverse(steps)}
+      error -> error
+    end
+  end
+
+  defp speculative(fun) do
+    fun.()
+  rescue
+    # Only callback-free optimization attempts run here. Replay outside this
+    # rescue so the original first failure (including an exception) survives.
+    _ -> :sequential
+  end
+
+  defp recover_group(result, nodes, context) do
+    case result do
+      {:ok, _, _} ->
+        result
+
+      _ ->
+        # Preparation and batch failure are not public recipe steps. Replay
+        # the pure nodes to retain the original first error and nested context.
+        Enum.reduce_while(nodes, context, fn node, acc ->
+          case evaluate_node(node, acc) do
+            {:ok, _, _} = next -> {:cont, next}
+            error -> {:halt, error}
+          end
+        end)
+    end
+  end
+
+  defp evaluate_node({{operation, args}, index}, {:ok, body, envelope}) do
+    result =
+      if operation in [:hole, :counterbore, :countersink] do
+        Smith.Features.Hole.evaluate(body, operation, args, envelope)
+      else
+        # Other operations can enlarge, move or replace the body. Never
+        # carry a previous hole run's bounds across such an AST node.
+        with {:ok, next} <- apply_operation(operation, body, args), do: {:ok, next, nil}
+      end
+
+    case result do
+      {:ok, _, _} -> result
+      {:error, reason} -> {:error, %Error{step: index, operation: operation, reason: reason}}
+    end
+  end
 
   @doc """
   Writes one geometry file, choosing its format from the path extension.
@@ -1315,8 +1529,8 @@ defmodule Smith do
   defp apply_operation(:face, body, []), do: OCEx.face(body)
 
   defp apply_operation(:project, body, [target, opts]) do
-    with {:ok, result} <- Smith.evaluate(target),
-         do: OCEx.project(body, result.shape, opts)
+    with {:ok, target_shape} <- evaluate_shape(target),
+         do: OCEx.project(body, target_shape, opts)
   end
 
   defp apply_operation(:surface, body, [selector]) do
@@ -1418,9 +1632,19 @@ defmodule Smith do
     do: apply(OCEx, op, [body | args])
 
   defp apply_operation(op, body, [%Model{} = tool]) when op in [:fuse, :cut, :common] do
-    with {:ok, result} <- evaluate(tool),
-         {:ok, shape} <- apply(OCEx, op, [body, result.shape]),
+    with {:ok, tool_shape} <- evaluate_shape(tool),
+         {:ok, shape} <- apply(OCEx, op, [body, tool_shape]),
          do: OCEx.clean(shape)
+  end
+
+  defp apply_operation(op, body, [tools]) when op in [:cut_many, :fuse_many] and is_list(tools) do
+    if Code.ensure_loaded?(OCEx) and function_exported?(OCEx, op, 2) do
+      with {:ok, shapes} <- evaluate_edges(tools),
+           {:ok, shape} <- apply(OCEx, op, [body, shapes]),
+           do: OCEx.clean(shape)
+    else
+      {:error, :unsupported_operation}
+    end
   end
 
   defp apply_operation(op, body, opts) when op in [:fillet, :chamfer] do
@@ -1460,13 +1684,14 @@ defmodule Smith do
          offset =
            0..2
            |> Enum.map(&(-anchor(elem(low, &1), elem(high, &1), elem(alignment, &1))))
-           |> List.to_tuple(),
-         {:ok, aligned} <- shift(shape, offset) do
-      shift(aligned, at)
+           |> List.to_tuple() do
+      shift(shape, Smith.Plane.add(offset, at))
     else
       false -> {:error, :invalid_options}
       error -> error
     end
+  rescue
+    ArithmeticError -> {:error, :invalid_argument}
   end
 
   defp point3?({x, y, z}), do: is_number(x) and is_number(y) and is_number(z)
@@ -1507,8 +1732,8 @@ defmodule Smith do
 
   defp evaluate_edges(edges) do
     Enum.reduce_while(edges, {:ok, []}, fn edge, {:ok, acc} ->
-      case evaluate(edge) do
-        {:ok, result} -> {:cont, {:ok, acc ++ [result.shape]}}
+      case evaluate_shape(edge) do
+        {:ok, shape} -> {:cont, {:ok, acc ++ [shape]}}
         error -> {:halt, error}
       end
     end)

@@ -36,6 +36,60 @@ defmodule Smith.RecipesTest do
              base |> Smith.cut([Smith.cylinder(-1, 2)]) |> Smith.evaluate() |> nested_error()
   end
 
+  test "nested tools retain error step information and validate retained snapshots" do
+    invalid = Smith.box(2, 2, 2) |> Smith.cut(Smith.cylinder(-1, 4))
+
+    assert {:error,
+            %Smith.Error{
+              step: 2,
+              operation: :cut,
+              reason: %Smith.Error{
+                step: 2,
+                operation: :cut,
+                reason: %Smith.Error{step: 1, operation: :cylinder}
+              }
+            }} = Smith.box(10, 10, 10) |> Smith.cut(invalid) |> Smith.evaluate()
+
+    {:ok, result} = Smith.box(2, 2, 2) |> Smith.evaluate()
+    tool = Smith.from_result(%{result | revision: "wrong"})
+
+    assert {:error,
+            %Smith.Error{
+              operation: :cut,
+              reason: %Smith.Error{operation: :from_result, reason: :revision_mismatch}
+            }} = Smith.box(10, 10, 10) |> Smith.cut(tool) |> Smith.evaluate()
+  end
+
+  test "nested evaluated tools preserve public content revisions and source geometry" do
+    {:ok, source} = Smith.box(4, 4, 4) |> Smith.evaluate()
+    {:ok, original} = OCEx.to_brep(source.shape)
+    tool = Smith.from_result(source) |> Smith.translate({1, 1, 1})
+    {:ok, result} = Smith.box(10, 10, 10) |> Smith.cut(tool) |> Smith.evaluate()
+    {:ok, volume} = OCEx.volume(result.shape)
+    assert_in_delta volume, 936, 1.0e-7
+    {:ok, brep} = OCEx.to_brep(result.shape)
+    assert result.revision == Base.encode16(:crypto.hash(:sha256, brep), case: :lower)
+    assert OCEx.to_brep(source.shape) == {:ok, original}
+  end
+
+  test "explicit batches support overlapping tools and retain empty-list identity" do
+    base = Smith.box(10, 10, 10)
+    tools = for x <- [5, 8], do: Smith.box(10, 10, 10) |> Smith.translate({x, 0, 0})
+    assert Smith.cut_many(base, []) == base
+    assert Smith.fuse_many(base, []) == base
+
+    for {op, volume} <- [cut_many: 500, fuse_many: 1800] do
+      {:ok, result} = apply(Smith, op, [base, tools]) |> Smith.evaluate()
+      {:ok, actual} = OCEx.volume(result.shape)
+      assert_in_delta actual, volume, 1.0e-7
+      assert OCEx.valid?(result.shape) == {:ok, true}
+    end
+
+    assert {:error,
+            %Smith.Error{operation: :cut_many, reason: %Smith.Error{operation: :cylinder}}} =
+             base |> Smith.cut_many([Smith.cylinder(-1, 2)]) |> Smith.evaluate()
+  end
+
   defp nested_error({:error, %Smith.Error{reason: %Smith.Error{} = reason}}), do: {:error, reason}
 
   test "nested recipes support boolean operations and placement" do
